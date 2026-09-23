@@ -1,0 +1,1990 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Persediaan Farmasi & Logistik</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F5F6F2;
+    --surface:#FFFFFF;
+    --surface-2:#FBFBF9;
+    --border:#E2E4DE;
+    --ink:#1C2B39;
+    --text:#26333D;
+    --text-secondary:#66757D;
+    --accent:#2F6F5E;
+    --accent-dark:#205446;
+    --accent-soft:#E1EEE8;
+    --warning:#C97A2B;
+    --warning-soft:#FAEBD9;
+    --danger:#B3432B;
+    --danger-soft:#F8E2DA;
+    --success:#2F8F5B;
+    --success-soft:#E1F0E6;
+    --sidebar-bg:#16232E;
+    --sidebar-text:#B9C6CC;
+    --sidebar-text-dim:#71828A;
+    --sidebar-active:#20313E;
+    --font-sans:'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono:'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#10161B; --surface:#182229; --surface-2:#141C22; --border:#2A363E;
+      --ink:#E7ECEE; --text:#DDE4E7; --text-secondary:#8FA0A8;
+      --accent:#5EBBA0; --accent-dark:#4AA089; --accent-soft:#1B322B;
+      --warning:#E0A458; --warning-soft:#3A2C18;
+      --danger:#E0876F; --danger-soft:#3A211C;
+      --success:#5EBBA0; --success-soft:#17281F;
+      --sidebar-bg:#0B1216; --sidebar-text:#93A4AB; --sidebar-text-dim:#5A6970; --sidebar-active:#182229;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#10161B; --surface:#182229; --surface-2:#141C22; --border:#2A363E;
+    --ink:#E7ECEE; --text:#DDE4E7; --text-secondary:#8FA0A8;
+    --accent:#5EBBA0; --accent-dark:#4AA089; --accent-soft:#1B322B;
+    --warning:#E0A458; --warning-soft:#3A2C18;
+    --danger:#E0876F; --danger-soft:#3A211C;
+    --success:#5EBBA0; --success-soft:#17281F;
+    --sidebar-bg:#0B1216; --sidebar-text:#93A4AB; --sidebar-text-dim:#5A6970; --sidebar-active:#182229;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg); color:var(--text); font-family:var(--font-sans);
+    font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased;
+  }
+  .num{font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+  a{color:var(--accent);}
+  button{font-family:inherit;cursor:pointer;}
+  ::selection{background:var(--accent-soft);}
+
+  /* ---- App shell ---- */
+  #app{display:flex;min-height:100vh;}
+
+  .sidebar{
+    width:236px; flex-shrink:0; background:var(--sidebar-bg); color:var(--sidebar-text);
+    display:flex; flex-direction:column; padding:20px 0; position:sticky; top:0; height:100vh; overflow-y:auto;
+  }
+  .brand{padding:0 20px 18px 20px; border-bottom:1px solid rgba(255,255,255,0.08); margin-bottom:14px;}
+  .brand-mark{font-size:22px; line-height:1;}
+  .brand-name{font-weight:600; color:#fff; font-size:15px; margin-top:8px;}
+  .brand-sub{font-size:12px; color:var(--sidebar-text-dim); margin-top:2px;}
+
+  .module-switch{display:flex; gap:6px; padding:0 16px; margin-bottom:18px;}
+  .module-btn{
+    flex:1; background:transparent; border:1px solid rgba(255,255,255,0.14); color:var(--sidebar-text);
+    padding:7px 8px; border-radius:7px; font-size:12.5px; font-weight:500; text-align:center; transition:background .15s, color .15s;
+  }
+  .module-btn.active{background:var(--accent); border-color:var(--accent); color:#fff;}
+  .module-btn:not(.active):hover{background:rgba(255,255,255,0.06);}
+
+  .nav-group-label{padding:2px 20px; font-size:11px; color:var(--sidebar-text-dim); margin:10px 0 4px;}
+  .nav-item{
+    display:flex; align-items:center; gap:10px; padding:9px 20px 9px 17px; color:var(--sidebar-text);
+    border-left:3px solid transparent; font-size:13.5px; font-weight:500; transition:background .12s, color .12s;
+  }
+  .nav-item:hover{background:rgba(255,255,255,0.05); color:#fff;}
+  .nav-item.active{background:var(--sidebar-active); border-left-color:var(--accent); color:#fff;}
+  .nav-item .ic{width:16px; text-align:center; font-size:14px;}
+  .nav-item[disabled], .nav-item.disabled{opacity:.4; pointer-events:none;}
+
+  .sidebar-foot{margin-top:auto; padding:14px 20px 0; font-size:11.5px; color:var(--sidebar-text-dim); border-top:1px solid rgba(255,255,255,0.08); padding-top:12px;}
+
+  .main{flex:1; min-width:0; display:flex; flex-direction:column;}
+  .topbar{
+    background:var(--surface); border-bottom:1px solid var(--border); padding:16px 28px;
+    display:flex; align-items:center; justify-content:space-between; gap:16px; position:sticky; top:0; z-index:5;
+  }
+  .topbar h1{font-size:18px; font-weight:600; margin:0; color:var(--ink);}
+  .topbar .sub{font-size:12.5px; color:var(--text-secondary); margin-top:2px;}
+  .topbar-right{display:flex; align-items:center; gap:10px;}
+  .badge{
+    font-size:11.5px; padding:4px 10px; border-radius:20px; font-weight:500; white-space:nowrap;
+  }
+  .badge-ok{background:var(--success-soft); color:var(--success);}
+  .badge-warn{background:var(--warning-soft); color:var(--warning);}
+  .badge-off{background:var(--surface-2); color:var(--text-secondary); border:1px solid var(--border);}
+
+  .filterbar{
+    background:var(--accent-soft); border-bottom:1px solid var(--border); padding:12px 28px;
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  }
+  .filterbar label{font-size:11.5px; color:var(--text-secondary); display:block; margin-bottom:3px;}
+  .filter-field{display:flex; flex-direction:column;}
+  .filterbar select, .filterbar input[type=text]{
+    font-family:inherit; font-size:13px; padding:6px 10px; border-radius:6px; border:1px solid var(--border);
+    background:var(--surface); color:var(--text); min-width:150px;
+  }
+  .filterbar input[type=text]{min-width:220px;}
+  .btn{
+    font-size:13px; font-weight:500; padding:7px 14px; border-radius:6px; border:1px solid var(--border);
+    background:var(--surface); color:var(--text);
+  }
+  .btn:hover{border-color:var(--accent);}
+  .btn-reset{margin-left:auto; align-self:flex-end;}
+  .btn-primary{background:var(--accent); border-color:var(--accent); color:#fff;}
+  .btn-primary:hover{background:var(--accent-dark);}
+
+  .content{padding:24px 28px 60px; flex:1;}
+  .content h2{font-size:16px; font-weight:600; color:var(--ink); margin:0 0 4px;}
+  .content .lede{color:var(--text-secondary); font-size:13px; margin:0 0 18px;}
+
+  /* stat cards */
+  .stat-row{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; margin-bottom:22px;}
+  .stat-card{
+    background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px 18px;
+  }
+  .stat-card .label{font-size:12px; color:var(--text-secondary); margin-bottom:8px;}
+  .stat-card .value{font-family:var(--font-mono); font-size:22px; font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums;}
+  .stat-card .value.small{font-size:19px;}
+  .stat-card .foot{font-size:11.5px; color:var(--text-secondary); margin-top:6px;}
+  .stat-card.accent{border-color:var(--accent); background:linear-gradient(180deg, var(--accent-soft), var(--surface) 65%);}
+
+  .two-col{display:grid; grid-template-columns:1.3fr 1fr; gap:16px; margin-bottom:22px;}
+  @media (max-width:980px){.two-col{grid-template-columns:1fr;}}
+
+  .panel{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:18px 20px;}
+  .panel h3{font-size:13.5px; font-weight:600; margin:0 0 14px; color:var(--ink);}
+  .mini-bar-row{display:flex; align-items:center; gap:10px; margin-bottom:11px; font-size:12.5px;}
+  .mini-bar-row .name{width:40%; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text);}
+  .mini-bar-track{flex:1; height:8px; background:var(--surface-2); border-radius:4px; overflow:hidden; border:1px solid var(--border);}
+  .mini-bar-fill{height:100%; background:var(--accent); border-radius:4px;}
+  .mini-bar-val{width:110px; text-align:right; font-family:var(--font-mono); font-size:12px; color:var(--text-secondary); flex-shrink:0;}
+
+  /* tables */
+  .table-wrap{background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden;}
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  thead th{
+    text-align:left; font-weight:600; font-size:12px; color:var(--text-secondary); background:var(--surface-2);
+    padding:10px 14px; border-bottom:1px solid var(--border); white-space:nowrap; user-select:none;
+  }
+  thead th.sortable{cursor:pointer;}
+  thead th.sortable:hover{color:var(--ink);}
+  thead th .arrow{opacity:.5; margin-left:3px; font-size:10px;}
+  tbody td{padding:9px 14px; border-bottom:1px solid var(--border); vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:var(--surface-2);}
+  td.num, th.num{text-align:right; font-family:var(--font-mono); font-variant-numeric:tabular-nums;}
+  td.center{text-align:center;}
+  .name-cell{max-width:340px;}
+  .name-primary{color:var(--text); font-weight:500;}
+  .name-secondary{color:var(--text-secondary); font-size:11.5px; margin-top:1px;}
+
+  .pill{display:inline-block; padding:3px 9px; border-radius:20px; font-size:11.5px; font-weight:500;}
+  .pill-ok{background:var(--success-soft); color:var(--success);}
+  .pill-over{background:var(--danger-soft); color:var(--danger);}
+  .pill-unset{background:var(--surface-2); color:var(--text-secondary); border:1px solid var(--border);}
+  .cat-select{font-family:inherit; font-size:12px; padding:3px 6px; border-radius:6px; border:1px solid var(--border); background:var(--surface); color:var(--text);}
+
+  .table-foot{display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-top:1px solid var(--border); background:var(--surface-2); font-size:12.5px; color:var(--text-secondary); flex-wrap:wrap; gap:10px;}
+  .pager{display:flex; align-items:center; gap:8px;}
+  .pager button{background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:4px 10px; font-size:12.5px; color:var(--text);}
+  .pager button:disabled{opacity:.4; cursor:default;}
+  .pager select{font-family:inherit; font-size:12.5px; padding:3px 6px; border-radius:6px; border:1px solid var(--border); background:var(--surface); color:var(--text);}
+
+  /* import */
+  .import-shell{max-width:640px;}
+  .dropzone{
+    border:2px dashed var(--border); border-radius:12px; background:var(--surface); padding:38px 24px;
+    text-align:center; transition:border-color .15s, background .15s; cursor:pointer;
+  }
+  .dropzone:hover, .dropzone.drag{border-color:var(--accent); background:var(--accent-soft);}
+  .dropzone .ic{font-size:30px; margin-bottom:10px;}
+  .dropzone .title{font-weight:600; color:var(--ink); margin-bottom:4px;}
+  .dropzone .hint{font-size:12.5px; color:var(--text-secondary);}
+  .import-summary{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:18px 20px; margin-top:16px;}
+  .import-summary .row{display:flex; justify-content:space-between; padding:6px 0; font-size:13px; border-bottom:1px solid var(--border);}
+  .import-summary .row:last-child{border-bottom:none;}
+  .import-summary .row .v{font-family:var(--font-mono); color:var(--ink); font-weight:500;}
+  .warn-box{background:var(--warning-soft); color:var(--warning); border-radius:8px; padding:10px 14px; font-size:12.5px; margin-top:12px;}
+  .empty-state{text-align:center; padding:60px 20px; color:var(--text-secondary);}
+  .empty-state .ic{font-size:34px; margin-bottom:10px;}
+  .empty-state .title{color:var(--ink); font-weight:600; margin-bottom:6px; font-size:14.5px;}
+  .empty-state a.link-action{color:var(--accent); font-weight:500; cursor:pointer;}
+  .link-action{color:var(--accent); font-weight:600; cursor:pointer; text-decoration:underline;}
+  .filter-note{
+    background:var(--accent-soft,#eef6f3); border:1px solid var(--accent); border-radius:8px;
+    padding:9px 14px; font-size:12.5px; color:var(--text); margin-bottom:16px;
+  }
+  .cloud-banner{
+    border-radius:8px; padding:9px 14px; font-size:12.5px; margin-bottom:14px; line-height:1.5;
+  }
+  .cloud-banner.on{ background:var(--accent-soft,#eef6f3); border:1px solid var(--accent); color:var(--text); }
+  .cloud-banner.off{ background:#fbecd4; border:1px solid #a8690b; color:#5c3d07; }
+  .cloud-banner.checking{ background:var(--surface-2,#f3f3f3); border:1px solid var(--border); color:var(--text-secondary); }
+  .cloud-banner.note{ background:transparent; border:1px dashed var(--border); color:var(--text-secondary); }
+  .cloud-status{ font-weight:600; margin-left:6px; }
+  .cloud-status.ok{ color:#1e8e5a; }
+  .cloud-status.err{ color:#b23a2e; }
+
+  .btn.small{padding:5px 10px; font-size:12px;}
+  .btn.danger{color:var(--danger); border-color:var(--danger);}
+  .btn.danger:hover{background:var(--danger-soft);}
+  .btn-save{background:var(--accent); border-color:var(--accent); color:#fff; margin-top:12px; font-weight:600;}
+  .btn-save:hover{background:var(--accent-dark);}
+  .btn-save:disabled{opacity:.5; cursor:default;}
+  .table-toolbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; gap:10px; flex-wrap:wrap;}
+  .upload-history{margin-top:8px;}
+
+  .modal-overlay{position:fixed; inset:0; background:rgba(10,16,20,.55); display:flex; align-items:center; justify-content:center; z-index:100; padding:20px;}
+  .modal-box{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:26px 28px; max-width:480px; width:100%; max-height:90vh; overflow-y:auto;}
+  .modal-box h3{margin:0 0 8px; font-size:16px; color:var(--ink);}
+  .modal-box .lede{margin-top:0;}
+  .modal-box form label{display:block; font-size:12.5px; color:var(--text-secondary); margin-top:12px; margin-bottom:4px;}
+  .modal-box form input[type=text], .modal-box form input[type=password]{
+    width:100%; font-family:inherit; font-size:13px; padding:8px 10px; border-radius:6px; border:1px solid var(--border);
+    background:var(--surface-2); color:var(--text);
+  }
+  .settings-gear{position:fixed; top:14px; right:18px; z-index:6; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-size:12.5px; color:var(--text-secondary); cursor:pointer;}
+  .settings-gear:hover{border-color:var(--accent); color:var(--ink);}
+
+  .note{font-size:12px; color:var(--text-secondary); margin-top:10px; line-height:1.6;}
+  .legend{display:flex; gap:14px; flex-wrap:wrap; margin-bottom:14px; font-size:12px; color:var(--text-secondary);}
+  .legend span{display:inline-flex; align-items:center; gap:5px;}
+  .legend i{width:9px; height:9px; border-radius:2px; display:inline-block;}
+
+  input[type=file]{display:none;}
+
+  @media (max-width:760px){
+    .sidebar{position:fixed; left:-236px; z-index:30; transition:left .2s;}
+    .sidebar.open{left:0;}
+    .topbar{padding:14px 16px;}
+    .filterbar{padding:10px 16px;}
+    .content{padding:18px 16px 50px;}
+    .two-col{grid-template-columns:1fr;}
+  }
+
+  /* ---- charts ---- */
+  .chart-box{position:relative; height:270px;}
+  .chart-box canvas{max-width:100%;}
+
+  /* ---- watermark ---- */
+  .watermark{
+    position:fixed; inset:0; z-index:9999; pointer-events:none;
+    background-repeat:repeat;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='180'%3E%3Cdefs%3E%3Cpattern id='wm' width='360' height='180' patternUnits='userSpaceOnUse' patternTransform='rotate(-28)'%3E%3Ctext x='10' y='105' font-family='Work Sans, sans-serif' font-size='24' font-weight='700' fill='rgba(28,43,57,0.055)' textLength='330' lengthAdjust='spacingAndGlyphs'%3EPENGADAAN %26 LOGISTIK%3C/text%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23wm)'/%3E%3C/svg%3E");
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]) .watermark{
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='180'%3E%3Cdefs%3E%3Cpattern id='wm' width='360' height='180' patternUnits='userSpaceOnUse' patternTransform='rotate(-28)'%3E%3Ctext x='10' y='105' font-family='Work Sans, sans-serif' font-size='24' font-weight='700' fill='rgba(231,236,238,0.07)' textLength='330' lengthAdjust='spacingAndGlyphs'%3EPENGADAAN %26 LOGISTIK%3C/text%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23wm)'/%3E%3C/svg%3E");
+    }
+  }
+  :root[data-theme="dark"] .watermark{
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='180'%3E%3Cdefs%3E%3Cpattern id='wm' width='360' height='180' patternUnits='userSpaceOnUse' patternTransform='rotate(-28)'%3E%3Ctext x='10' y='105' font-family='Work Sans, sans-serif' font-size='24' font-weight='700' fill='rgba(231,236,238,0.07)' textLength='330' lengthAdjust='spacingAndGlyphs'%3EPENGADAAN %26 LOGISTIK%3C/text%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23wm)'/%3E%3C/svg%3E");
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="watermark" aria-hidden="true"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  /* ============================= CONSTANTS ============================= */
+
+  var CATEGORIES = ["Tablet","Syrup","Injeksi","Salep","Chemicellien","Alkes","Lain-lain"];
+  var overrides = {}; // itemKey -> manual kategori override, cached in localStorage + synced to GitHub
+
+  var BUDGET_TABLE = [
+    {code:"122", nama:"122 - INSTALASI LABORATORIUM GRESIK", batas:204969885},
+    {code:"121", nama:"121 - INSTALASI BEDAH SENTRAL (IBS)", batas:456886522},
+    {code:"152", nama:"152 - DEPO FARMASI IGD", batas:412803731},
+    {code:"102", nama:"102 - Gudang Obat PT CN", batas:713059292},
+    {code:"119", nama:"119 - INSTALASI FARMASI RSSG (RAWAT INAP)", batas:723666685},
+    {code:"134", nama:"134 - INSTALASI FARMASI RSSG (RAWAT JALAN)", batas:2067481898},
+    {code:"124", nama:"124 - POLI GIGI GRESIK", batas:49809047},
+    {code:"126", nama:"126 - POLIKLINIK KIA/KB", batas:108679450},
+    {code:"138", nama:"138 - HEMODIALISIS", batas:172158397},
+    {code:"123", nama:"123 - RADIOLOGI GRESIK", batas:29104077},
+    {code:"131", nama:"131 - SUB DAPUR GRESIK", batas:65494783},
+    {code:"133", nama:"133 - UMUM CETAKAN GRESIK", batas:95931327},
+    {code:"137", nama:"137 - CSSD", batas:97004848},
+    {code:"125", nama:"125 - CHECK UP GRESIK", batas:36338695},
+    {code:"151", nama:"151 - CATH LAB", batas:0},
+    {code:"129", nama:"129 - ENDOSCOPY GRESIK", batas:13653417},
+    {code:"101", nama:"101 - Gudang Non Obat PT CN", batas:126712095}
+  ];
+  var BUDGET_LOOKUP = {};
+  BUDGET_TABLE.forEach(function(b){ BUDGET_LOOKUP[b.code] = b.batas; });
+
+  var HEADER_MAP = {
+    "idgudang":"idGudang", "namagudang":"namaGudang", "idbarang":"idBarang",
+    "kodebarang":"kodeBarang", "namabarang":"namaBarang", "qty":"qty",
+    "status":"status", "hargapokok":"hargaPokok", "persediaan":"persediaan",
+    "namaprodusen":"namaProdusen", "namalokasi":"namaLokasi", "kodelokasi":"kodeLokasi",
+    "stokmaksimal":"stokMaksimal", "stokminimal":"stokMinimal", "batch":"batch"
+  };
+
+  var LOG_HEADER_MAP = {
+    "barang":"namaBarang", "kodebarang":"kodeBarang", "idbarang":"idBarang", "gudang":"gudang",
+    "golongan":"golongan", "qty":"qty", "hargapokok":"hargaPokok", "persediaan":"persediaan",
+    "produsen":"produsen", "namalokasipenyimpanan":"namaLokasi", "kodelokasi":"kodeLokasi",
+    "batch":"batch", "periode":"periode", "status":"status"
+  };
+
+  /* ============================= STATE ============================= */
+
+  var state = {
+    currentModule: "farmasi",
+    activeTab: { farmasi: "ringkasan", logistik: "ringkasan" },
+    farmasi: {
+      loaded:false, filename:null, rows:[], skipped:0,
+      cloudStatus:"idle", cloudMessage:null, activeUploadPath:null, uploads:[],
+      filters:{ gudang:"all", kategori:"all", q:"" },
+      sort:{ gudang:{key:"nilai",dir:"desc"}, kategori:{key:"nilai",dir:"desc"}, detail:{key:"nilai",dir:"desc"} },
+      page:{ gudang:1, kategori:1, detail:1 },
+      pageSize:{ gudang:25, kategori:25, detail:25 }
+    },
+    logistik: {
+      loaded:false, filename:null, rows:[], skipped:0, golonganList:[],
+      cloudStatus:"idle", cloudMessage:null, activeUploadPath:null, uploads:[],
+      filters:{ gudang:"all", golongan:"all", q:"" },
+      sort:{ gudang:{key:"nilai",dir:"desc"}, golongan:{key:"nilai",dir:"desc"}, detail:{key:"nilai",dir:"desc"} },
+      page:{ gudang:1, golongan:1, detail:1 },
+      pageSize:{ gudang:25, golongan:25, detail:25 }
+    }
+  };
+  state.cloudAvailable = undefined; // undefined = checking, true/false once known
+  state.cloudConnError = null;
+  state.showSettings = false;
+
+  /* ============================= GITHUB STORAGE (save & upload history) =============================
+   * Every "Simpan ke GitHub" click writes the currently-loaded rows as ONE NEW JSON file under
+   * data/<module>/<timestamp>__<slug>.json in the configured repo, via the GitHub REST "contents"
+   * API, called directly from the browser using a Personal Access Token the person enters once
+   * (stored only in this browser's localStorage). Because each save creates a new file/commit
+   * instead of overwriting one, listing that folder IS the upload history — no separate database
+   * needed. Reading a file back uses its public raw download_url (works for repos of any size,
+   * unlike the GitHub API's 1MB inline-content limit), which only works for public repos; a
+   * private repo would need authenticated fetches instead. */
+
+  var GH_CONFIG_KEY = "stokdash_gh_config_v1";
+  var OVERRIDES_KEY = "stokdash_overrides_v1";
+  var CLOUD_HISTORY_LIMIT_DEFAULT = 15; // fallback if ghConfig.historyLimit is unset
+
+  var FARMASI_FIELDS  = ["gudang","kodeBarang","idBarang","namaBarang","qty","hargaPokok","persediaan","kategori","status"];
+  var LOGISTIK_FIELDS = ["gudang","kodeBarang","idBarang","namaBarang","qty","hargaPokok","persediaan","kategori","produsen","status"];
+
+  var ghConfig = { owner:null, repo:null, branch:"main", token:null, historyLimit: CLOUD_HISTORY_LIMIT_DEFAULT };
+
+  function loadGhConfig(){
+    try{
+      var raw = localStorage.getItem(GH_CONFIG_KEY);
+      if(raw) ghConfig = Object.assign(ghConfig, JSON.parse(raw));
+    }catch(e){}
+  }
+  function saveGhConfig(){
+    try{ localStorage.setItem(GH_CONFIG_KEY, JSON.stringify(ghConfig)); }catch(e){}
+  }
+  function ghConfigured(){ return !!(ghConfig.owner && ghConfig.repo && ghConfig.token); }
+
+  function loadOverridesLocal(){
+    try{
+      var raw = localStorage.getItem(OVERRIDES_KEY);
+      if(raw) overrides = JSON.parse(raw) || {};
+    }catch(e){}
+  }
+  function saveOverrides(){
+    try{ localStorage.setItem(OVERRIDES_KEY, JSON.stringify(overrides)); }catch(e){}
+  }
+
+  // ---- base64 helpers that survive UTF-8 (Indonesian text) and multi-MB payloads ----
+  function bytesToBase64(bytes){
+    var CHUNK = 0x8000, binary = "";
+    for(var i=0;i<bytes.length;i+=CHUNK){
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i+CHUNK));
+    }
+    return btoa(binary);
+  }
+  function utf8ToB64(str){ return bytesToBase64(new TextEncoder().encode(str)); }
+  function b64ToUtf8(b64){
+    var binary = atob(b64.replace(/\n/g,""));
+    var bytes = new Uint8Array(binary.length);
+    for(var i=0;i<binary.length;i++) bytes[i] = binary.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+
+  function encodeRow(row, fields){ return fields.map(function(f){ var v=row[f]; return v===undefined?null:v; }); }
+  function decodeRow(arr, fields){ var o={}; fields.forEach(function(f,i){ o[f]=arr[i]===undefined?null:arr[i]; }); return o; }
+  function slugify(s){
+    return String(s||"file").toLowerCase().replace(/\.[^.]+$/,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"").slice(0,40) || "file";
+  }
+  function isoStamp(){ return new Date().toISOString().replace(/[:.]/g,"-"); }
+  function ghDataPath(moduleKey){ return "data/"+moduleKey; }
+
+  async function ghRequest(method, path, body){
+    var opts = { method: method, headers: {
+      "Authorization": "Bearer "+ghConfig.token,
+      "Accept": "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28"
+    }};
+    if(body!==undefined){ opts.headers["Content-Type"]="application/json"; opts.body=JSON.stringify(body); }
+    var res = await fetch("https://api.github.com/repos/"+encodeURIComponent(ghConfig.owner)+"/"+encodeURIComponent(ghConfig.repo)+path, opts);
+    if(!res.ok){
+      var msg = "";
+      try{ var j = await res.json(); msg = j.message||""; }catch(e){}
+      var err = new Error(msg || ("GitHub API error "+res.status));
+      err.status = res.status;
+      throw err;
+    }
+    if(res.status===204) return null;
+    return res.json();
+  }
+
+  async function ghTestConnection(){
+    try{ var repo = await ghRequest("GET",""); return {ok:true, repo:repo}; }
+    catch(err){ return {ok:false, message: err.message}; }
+  }
+
+  async function ghListUploads(moduleKey){
+    try{
+      var list = await ghRequest("GET", "/contents/"+ghDataPath(moduleKey)+"?ref="+encodeURIComponent(ghConfig.branch));
+      if(!Array.isArray(list)) return [];
+      return list.filter(function(f){ return f.type==="file" && /\.json$/.test(f.name) && f.name!=="_overrides.json"; })
+        .sort(function(a,b){ return a.name < b.name ? 1 : -1; }); // filenames start with ISO timestamp -> desc = newest first
+    }catch(err){
+      if(err.status===404) return []; // data/<module> folder doesn't exist yet — not an error
+      throw err;
+    }
+  }
+
+  async function ghCreateUpload(moduleKey, rows, fields, metaExtra){
+    var name = isoStamp()+"__"+slugify(metaExtra.filename)+".json";
+    var path = ghDataPath(moduleKey)+"/"+name;
+    var payload = {
+      label: metaExtra.filename || "Upload",
+      filename: metaExtra.filename || null,
+      uploadedAt: new Date().toISOString(),
+      rowCount: rows.length,
+      skipped: metaExtra.skipped || 0,
+      fields: fields,
+      rows: rows.map(function(r){ return encodeRow(r, fields); })
+    };
+    var res = await ghRequest("PUT", "/contents/"+path, {
+      message: "Upload data "+moduleKey+": "+(metaExtra.filename||name),
+      content: utf8ToB64(JSON.stringify(payload)),
+      branch: ghConfig.branch
+    });
+    return { ok:true, path: path, name: name, sha: res.content && res.content.sha };
+  }
+
+  async function ghLoadUpload(file, fields){
+    var res = await fetch(file.download_url);
+    if(!res.ok) throw new Error("Gagal mengambil data dari GitHub ("+res.status+")");
+    var payload = await res.json();
+    var useFields = payload.fields || fields;
+    var rows = (payload.rows||[]).map(function(enc){ return decodeRow(enc, useFields); });
+    return { meta: payload, rows: rows };
+  }
+
+  async function ghGetFileSha(path){
+    var meta = await ghRequest("GET", "/contents/"+path+"?ref="+encodeURIComponent(ghConfig.branch));
+    return meta.sha;
+  }
+
+  async function ghDeleteUpload(moduleKey, file){
+    var sha = file.sha || await ghGetFileSha(file.path);
+    await ghRequest("DELETE", "/contents/"+file.path, {
+      message: "Hapus data "+moduleKey+": "+file.name,
+      sha: sha,
+      branch: ghConfig.branch
+    });
+  }
+
+  async function ghRenameUpload(moduleKey, file, newLabel){
+    var res = await fetch(file.download_url);
+    var payload = await res.json();
+    payload.label = newLabel;
+    var sha = file.sha || await ghGetFileSha(file.path);
+    await ghRequest("PUT", "/contents/"+file.path, {
+      message: "Ganti nama file "+moduleKey+": "+newLabel,
+      content: utf8ToB64(JSON.stringify(payload)),
+      sha: sha,
+      branch: ghConfig.branch
+    });
+  }
+
+  async function ghPruneUploads(moduleKey){
+    var list = await ghListUploads(moduleKey);
+    var limit = Number(ghConfig.historyLimit);
+    if(!limit || limit<=0) return; // 0 / unset / invalid = unlimited, no auto-delete
+    if(list.length <= limit) return;
+    var toRemove = list.slice(limit);
+    for(var i=0;i<toRemove.length;i++){ try{ await ghDeleteUpload(moduleKey, toRemove[i]); }catch(e){} }
+  }
+
+  async function ghLoadOverridesRemote(){
+    try{
+      var meta = await ghRequest("GET", "/contents/data/farmasi/_overrides.json?ref="+encodeURIComponent(ghConfig.branch));
+      var json = JSON.parse(b64ToUtf8(meta.content));
+      return { overrides: json.overrides||{}, sha: meta.sha };
+    }catch(err){ return null; }
+  }
+  async function ghSaveOverridesRemote(){
+    if(!ghConfigured()) return;
+    try{
+      var existing = await ghLoadOverridesRemote();
+      var body = {
+        message: "Perbarui kategori override",
+        content: utf8ToB64(JSON.stringify({overrides:overrides, updatedAt:new Date().toISOString()})),
+        branch: ghConfig.branch
+      };
+      if(existing && existing.sha) body.sha = existing.sha;
+      await ghRequest("PUT", "/contents/data/farmasi/_overrides.json", body);
+    }catch(e){}
+  }
+
+  function applyLoadedUpload(moduleKey, fields, file, res){
+    var st = state[moduleKey];
+    if(!res){ st.cloudStatus="error"; st.cloudMessage="Gagal memuat data dari GitHub."; return; }
+    var rows = res.rows;
+    if(moduleKey==="farmasi") rows.forEach(function(r){ r.kategori = getCategory(r); });
+    st.rows = rows; st.loaded = true;
+    st.filename = (res.meta && (res.meta.label||res.meta.filename)) || file.name;
+    st.skipped = (res.meta && res.meta.skipped) || 0;
+    st.activeUploadPath = file.path;
+    st.cloudStatus = "saved"; st.cloudMessage = null;
+    if(moduleKey==="logistik") st.golonganList = Array.from(new Set(rows.map(function(r){return r.kategori;}))).sort();
+    st.page = moduleKey==="farmasi" ? {gudang:1,kategori:1,detail:1} : {gudang:1,golongan:1,detail:1};
+  }
+
+  function refreshUploadList(moduleKey){
+    if(!ghConfigured()){ state[moduleKey].uploads=[]; render(); return; }
+    ghListUploads(moduleKey).then(function(list){ state[moduleKey].uploads=list; render(); })
+      .catch(function(err){ state[moduleKey].cloudMessage=err.message; render(); });
+  }
+
+  function saveUploadToGithub(moduleKey){
+    if(!ghConfigured()){ openSettings(); return; }
+    var fields = moduleKey==="farmasi" ? FARMASI_FIELDS : LOGISTIK_FIELDS;
+    state[moduleKey].cloudStatus = "saving"; state[moduleKey].cloudMessage=null; render();
+    ghCreateUpload(moduleKey, state[moduleKey].rows, fields, {filename: state[moduleKey].filename, skipped: state[moduleKey].skipped})
+      .then(function(res){
+        state[moduleKey].activeUploadPath = res.path;
+        state[moduleKey].cloudStatus = "saved";
+        state[moduleKey].cloudMessage = "Tersimpan ke GitHub sebagai "+res.name;
+        render();
+        ghPruneUploads(moduleKey).then(function(){ refreshUploadList(moduleKey); });
+      })
+      .catch(function(err){
+        state[moduleKey].cloudStatus = "error"; state[moduleKey].cloudMessage = err.message; render();
+      });
+  }
+
+  function viewUpload(moduleKey, path){
+    var file = (state[moduleKey].uploads||[]).filter(function(f){ return f.path===path; })[0];
+    if(!file) return;
+    var fields = moduleKey==="farmasi" ? FARMASI_FIELDS : LOGISTIK_FIELDS;
+    state[moduleKey].cloudStatus = "saving"; render();
+    ghLoadUpload(file, fields).then(function(res){
+      applyLoadedUpload(moduleKey, fields, file, res);
+      state.activeTab[moduleKey] = "ringkasan";
+      render();
+    }).catch(function(err){ state[moduleKey].cloudStatus="error"; state[moduleKey].cloudMessage=err.message; render(); });
+  }
+
+  function renameUploadPrompt(moduleKey, path, currentLabel){
+    var next = prompt("Ganti nama file:", currentLabel||"");
+    if(next===null) return;
+    next = next.trim(); if(!next) return;
+    var file = (state[moduleKey].uploads||[]).filter(function(f){ return f.path===path; })[0];
+    if(!file) return;
+    ghRenameUpload(moduleKey, file, next).then(function(){
+      if(state[moduleKey].activeUploadPath===path) state[moduleKey].filename = next;
+      refreshUploadList(moduleKey);
+    }).catch(function(err){ alert("Gagal mengganti nama: "+err.message); });
+  }
+
+  function deleteUploadConfirm(moduleKey, path, label){
+    var warn = 'Hapus file "'+label+'" dari riwayat GitHub untuk SEMUA orang? Ini membuat commit baru di repo dan tidak bisa dibatalkan dari dashboard ini.';
+    if(!confirm(warn)) return;
+    var file = (state[moduleKey].uploads||[]).filter(function(f){ return f.path===path; })[0];
+    if(!file) return;
+    ghDeleteUpload(moduleKey, file).then(function(){
+      if(state[moduleKey].activeUploadPath===path){
+        state[moduleKey].loaded=false; state[moduleKey].rows=[]; state[moduleKey].filename=null; state[moduleKey].activeUploadPath=null;
+        if(moduleKey==="logistik") state.logistik.golonganList=[];
+      }
+      refreshUploadList(moduleKey);
+    }).catch(function(err){ alert("Gagal menghapus: "+err.message); });
+  }
+
+  function openSettings(){ state.showSettings = true; render(); }
+  function closeSettings(){ state.showSettings = false; render(); }
+  function clearGithubSettings(){
+    if(!confirm("Hapus konfigurasi GitHub dari browser ini?")) return;
+    ghConfig = { owner:null, repo:null, branch:"main", token:null, historyLimit: CLOUD_HISTORY_LIMIT_DEFAULT };
+    try{ localStorage.removeItem(GH_CONFIG_KEY); }catch(e){}
+    state.cloudAvailable = false;
+    state.farmasi.uploads = []; state.logistik.uploads = [];
+    state.showSettings = false;
+    render();
+  }
+  function submitGithubSettings(form){
+    function val(name){ var el = form.querySelector('[name="'+name+'"]'); return el ? el.value : ""; }
+    ghConfig.owner = (val("owner")||"").trim();
+    ghConfig.repo = (val("repo")||"").trim();
+    ghConfig.branch = (val("branch")||"main").trim() || "main";
+    ghConfig.token = (val("token")||"").trim();
+    var limitRaw = (val("historyLimit")||"").trim();
+    ghConfig.historyLimit = limitRaw==="" ? CLOUD_HISTORY_LIMIT_DEFAULT : Math.max(0, parseInt(limitRaw,10)||0);
+    saveGhConfig();
+    state.showSettings = false;
+    render();
+    initGithub();
+  }
+
+  async function initGithub(){
+    loadGhConfig();
+    loadOverridesLocal();
+    if(!ghConfigured()){ state.cloudAvailable=false; render(); return; }
+    state.cloudAvailable = undefined; render();
+    var test = await ghTestConnection();
+    state.cloudAvailable = test.ok;
+    state.cloudConnError = test.ok ? null : test.message;
+    if(!test.ok){ render(); return; }
+
+    var remoteOv = await ghLoadOverridesRemote();
+    if(remoteOv){ overrides = remoteOv.overrides || {}; saveOverrides(); }
+
+    var lists = await Promise.all([
+      ghListUploads("farmasi").catch(function(){ return []; }),
+      ghListUploads("logistik").catch(function(){ return []; })
+    ]);
+    state.farmasi.uploads = lists[0];
+    state.logistik.uploads = lists[1];
+
+    var loads = [];
+    if(lists[0].length) loads.push(ghLoadUpload(lists[0][0], FARMASI_FIELDS).then(function(res){ applyLoadedUpload("farmasi", FARMASI_FIELDS, lists[0][0], res); }).catch(function(){}));
+    if(lists[1].length) loads.push(ghLoadUpload(lists[1][0], LOGISTIK_FIELDS).then(function(res){ applyLoadedUpload("logistik", LOGISTIK_FIELDS, lists[1][0], res); }).catch(function(){}));
+    await Promise.all(loads);
+    render();
+  }
+
+  function parseUploadStamp(name){
+    var m = String(name||"").match(/^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z/);
+    if(!m) return null;
+    var d = new Date(m[1]+"T"+m[2]+":"+m[3]+":"+m[4]+"."+m[5]+"Z");
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function cloudBanner(moduleKey){
+    if(!ghConfigured()){
+      return '<div class="cloud-banner off">⚙️ Penyimpanan GitHub belum diatur — data hanya tersimpan sementara di perangkat ini. <span class="link-action" data-action="open-settings">Atur GitHub</span></div>';
+    }
+    if(state.cloudAvailable === undefined){
+      return '<div class="cloud-banner checking">🔄 Menghubungkan ke GitHub ('+esc(ghConfig.owner+"/"+ghConfig.repo)+')…</div>';
+    }
+    if(state.cloudAvailable === false){
+      return '<div class="cloud-banner off">⚠️ Gagal terhubung ke GitHub'+(state.cloudConnError?(": "+esc(state.cloudConnError)):"")+'. <span class="link-action" data-action="open-settings">Cek pengaturan</span></div>';
+    }
+    var m = state[moduleKey];
+    var html = '<div class="cloud-banner on">🔗 Terhubung ke <b>'+esc(ghConfig.owner+"/"+ghConfig.repo)+'</b> (branch '+esc(ghConfig.branch)+'). Klik tombol "Simpan ke GitHub" di bawah setelah data terlihat benar.';
+    if(m.cloudStatus==="saving") html += ' <span class="cloud-status">Memproses…</span>';
+    else if(m.cloudStatus==="saved" && m.cloudMessage) html += ' <span class="cloud-status ok">'+esc(m.cloudMessage)+'</span>';
+    else if(m.cloudStatus==="error") html += ' <span class="cloud-status err">Gagal'+(m.cloudMessage?(": "+esc(m.cloudMessage)):"")+'.</span>';
+    html += ' <span class="link-action" data-action="open-settings">⚙️ Pengaturan</span>';
+    html += '</div>';
+    return html;
+  }
+
+  function renderUploadHistory(moduleKey){
+    var uploads = state[moduleKey].uploads || [];
+    var html = '<div class="upload-history">';
+    html += '<div class="table-toolbar"><h3 style="margin:0">Riwayat file diupload</h3>';
+    html += '<button class="btn small" data-action="refresh-uploads" data-module="'+moduleKey+'">🔄 Muat ulang</button></div>';
+    if(!ghConfigured()){
+      html += '<div class="note">Riwayat hanya tersedia setelah GitHub diatur. <span class="link-action" data-action="open-settings">Atur sekarang</span></div></div>';
+      return html;
+    }
+    if(state.cloudAvailable===false){
+      html += '<div class="note">Tidak dapat terhubung ke GitHub'+(state.cloudConnError?(": "+esc(state.cloudConnError)):"")+'.</div></div>';
+      return html;
+    }
+    if(!uploads.length){
+      html += '<div class="note">Belum ada file yang tersimpan sebagai riwayat di repo ini.</div></div>';
+      return html;
+    }
+    html += '<div class="table-wrap"><table><thead><tr><th>Nama file</th><th>Diupload</th><th class="num">Ukuran</th><th></th></tr></thead><tbody>';
+    uploads.forEach(function(u){
+      var isActive = state[moduleKey].activeUploadPath === u.path;
+      var sizeKb = u.size ? Math.round(u.size/1024) : null;
+      html += '<tr'+(isActive?' style="background:var(--accent-soft)"':'')+'>';
+      var stamp = parseUploadStamp(u.name);
+      var displayName = u.name.replace(/^\d{4}-\d{2}-\d{2}T[\d-]+Z__/,"").replace(/\.json$/,"");
+      html += '<td class="name-cell"><div class="name-primary">'+esc(displayName)+'</div>'+(isActive?'<div class="name-secondary">Sedang ditampilkan</div>':'')+'</td>';
+      html += '<td>'+(stamp ? esc(stamp.toLocaleString("id-ID")) : "-")+'</td>';
+      html += '<td class="num">'+(sizeKb!==null ? fmtNum(sizeKb)+" KB" : "-")+'</td>';
+      html += '<td style="white-space:nowrap;">';
+      if(!isActive) html += '<button class="btn small" data-action="select-upload" data-module="'+moduleKey+'" data-path="'+esc(u.path)+'">Lihat</button> ';
+      html += '<button class="btn small" data-action="rename-upload" data-module="'+moduleKey+'" data-path="'+esc(u.path)+'" data-label="'+esc(u.name)+'">✏️ Ganti nama</button> ';
+      if(u.html_url) html += '<a class="btn small" href="'+esc(u.html_url)+'" target="_blank" rel="noopener">↗ GitHub</a> ';
+      html += '<button class="btn small danger" data-action="delete-upload" data-module="'+moduleKey+'" data-path="'+esc(u.path)+'" data-label="'+esc(u.name)+'">🗑️ Hapus</button>';
+      html += '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+    var limitNote = (Number(ghConfig.historyLimit)>0)
+      ? ('Maks '+ghConfig.historyLimit+' file terbaru disimpan per modul — file terlama dihapus otomatis saat menyimpan file baru.')
+      : 'Tanpa batas jumlah riwayat — file lama tidak akan dihapus otomatis. Kelola manual lewat tombol Hapus di atas bila repo mulai besar.';
+    html += '<div class="note">'+limitNote+'</div>';
+    html += '</div>';
+    return html;
+  }
+
+  function renderSettingsModal(){
+    if(!state.showSettings) return "";
+    var html = '<div class="modal-overlay" data-action="close-settings">';
+    html += '<div class="modal-box">';
+    html += '<h3>⚙️ Pengaturan penyimpanan GitHub</h3>';
+    html += '<p class="lede">Data yang diupload disimpan sebagai file JSON di repository GitHub Anda lewat GitHub REST API, langsung dari browser ini. Setiap orang di tim yang ingin menyimpan atau membuka riwayat perlu mengisi form ini dengan token miliknya sendiri.</p>';
+    html += '<form id="gh-settings-form" onsubmit="return false">';
+    html += '<label>Pemilik / organisasi (owner)<input type="text" name="owner" value="'+esc(ghConfig.owner||"")+'" placeholder="contoh: nama-user atau nama-organisasi"></label>';
+    html += '<label>Nama repository<input type="text" name="repo" value="'+esc(ghConfig.repo||"")+'" placeholder="contoh: dashboard-stok"></label>';
+    html += '<label>Branch<input type="text" name="branch" value="'+esc(ghConfig.branch||"main")+'" placeholder="main"></label>';
+    html += '<label>Personal Access Token<input type="password" name="token" value="'+esc(ghConfig.token||"")+'" placeholder="github_pat_... atau ghp_..."></label>';
+    html += '<div class="note">Token disimpan HANYA di localStorage browser ini dan dipakai untuk memanggil GitHub API langsung dari browser Anda — tidak pernah dikirim ke server lain. Gunakan <b>fine-grained token</b> yang scope-nya dibatasi ke repo ini saja, izin "Contents: Read and write", dengan masa berlaku (expiration) yang wajar.</div>';
+    html += '<label>Maksimum riwayat per modul (0 = tanpa batas)<input type="text" inputmode="numeric" name="historyLimit" value="'+esc(ghConfig.historyLimit===0?"0":(ghConfig.historyLimit||CLOUD_HISTORY_LIMIT_DEFAULT))+'" placeholder="15"></label>';
+    html += '<div class="note">File farmasi/logistik bisa berukuran beberapa MB per upload. Riwayat tanpa batas berarti repo GitHub akan terus membesar seiring waktu dan tidak akan mengecil lagi walau file dihapus dari sini (histori commit tetap menyimpannya) — sesuaikan sesuai kenyamanan Anda mengelola ukuran repo.</div>';
+    html += '<div style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;">';
+    html += '<button type="button" class="btn btn-primary" data-action="save-settings">Simpan &amp; sambungkan</button>';
+    html += '<button type="button" class="btn" data-action="close-settings">Batal</button>';
+    if(ghConfigured()) html += '<button type="button" class="btn danger" data-action="clear-settings">Hapus konfigurasi</button>';
+    html += '</div>';
+    html += '</form>';
+    html += '</div></div>';
+    return html;
+  }
+
+  /* ============================= HELPERS ============================= */
+
+  function fmtRupiah(n){
+    n = Math.round(Number(n)||0);
+    if(n===0) return "Rp 0";
+    return "Rp " + n.toLocaleString("id-ID", {maximumFractionDigits:0});
+  }
+  function fmtNum(n){
+    n = Number(n)||0;
+    return n.toLocaleString("id-ID", {maximumFractionDigits:0});
+  }
+  function fmtPct(n){
+    if(n===null || n===undefined || !isFinite(n)) return "-";
+    return n.toLocaleString("id-ID",{maximumFractionDigits:1}) + "%";
+  }
+  function esc(s){
+    return String(s===null||s===undefined?"":s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+  function normalizeHeader(h){ return String(h||"").toLowerCase().replace(/[^a-z0-9]/g,""); }
+  function extractCode(namaGudang){
+    var m = String(namaGudang||"").trim().match(/^(\d+)\s*-/);
+    return m ? m[1] : null;
+  }
+  function itemKey(row){
+    if(row.idBarang!==null && row.idBarang!==undefined && row.idBarang!=="") return "ID"+row.idBarang;
+    return row.kodeBarang || row.namaBarang || "?";
+  }
+
+  var DIGIT_CATEGORY_MAP = {"1":"Tablet","2":"Syrup","3":"Injeksi","4":"Salep","5":"Chemicellien","6":"Alkes","7":"Alkes"};
+  function firstDigitChar(s){
+    var m = String(s||"").match(/\d/);
+    return m ? m[0] : null;
+  }
+  function autoClassify(namaBarang, kodeBarang){
+    var d = firstDigitChar(namaBarang);
+    if(d===null) d = firstDigitChar(kodeBarang);
+    if(d===null) return "Lain-lain";
+    return DIGIT_CATEGORY_MAP[d] || "Lain-lain";
+  }
+  function getCategory(row){
+    var key = itemKey(row);
+    if(overrides[key] && CATEGORIES.indexOf(overrides[key]) !== -1) return overrides[key];
+    return autoClassify(row.namaBarang, row.kodeBarang);
+  }
+
+  function sortRows(rows, key, dir){
+    var arr = rows.slice();
+    arr.sort(function(a,b){
+      var va = a[key], vb = b[key];
+      if(typeof va === "string" || typeof vb === "string"){
+        va = String(va===null||va===undefined?"":va); vb = String(vb===null||vb===undefined?"":vb);
+        return dir==="asc" ? va.localeCompare(vb) : vb.localeCompare(va);
+      }
+      va = (va===null||va===undefined) ? -Infinity : va;
+      vb = (vb===null||vb===undefined) ? -Infinity : vb;
+      return dir==="asc" ? va-vb : vb-va;
+    });
+    return arr;
+  }
+  function paginate(rows, page, pageSize){
+    var start = (page-1)*pageSize;
+    return rows.slice(start, start+pageSize);
+  }
+  function debounce(fn, ms){
+    var t;
+    return function(){
+      var args = arguments, ctx = this;
+      clearTimeout(t);
+      t = setTimeout(function(){ fn.apply(ctx, args); }, ms);
+    };
+  }
+
+  /* ============================= PARSING (FARMASI) ============================= */
+
+  function parseFarmasiWorkbook(wb){
+    var sheet = wb.Sheets[wb.SheetNames[0]];
+    var raw = XLSX.utils.sheet_to_json(sheet, {defval:null});
+    if(!raw.length) return {rows:[], skipped:0};
+
+    var headerKeys = Object.keys(raw[0]);
+    var fieldByHeader = {};
+    headerKeys.forEach(function(h){
+      var norm = normalizeHeader(h);
+      if(HEADER_MAP[norm]) fieldByHeader[h] = HEADER_MAP[norm];
+    });
+
+    var rows = [];
+    var skipped = 0;
+    raw.forEach(function(r){
+      var obj = {};
+      headerKeys.forEach(function(h){
+        var field = fieldByHeader[h];
+        if(field) obj[field] = r[h];
+      });
+      if(!obj.namaGudang || !obj.namaBarang){ skipped++; return; }
+      var qty = Number(obj.qty)||0;
+      var hargaPokok = Number(obj.hargaPokok)||0;
+      var persediaan = (obj.persediaan!==null && obj.persediaan!==undefined && obj.persediaan!=="")
+        ? Number(obj.persediaan) : (qty*hargaPokok);
+      var row = {
+        gudang: String(obj.namaGudang).trim(),
+        kodeBarang: obj.kodeBarang ? String(obj.kodeBarang).trim() : null,
+        idBarang: (obj.idBarang!==null && obj.idBarang!==undefined && obj.idBarang!=="") ? obj.idBarang : null,
+        namaBarang: String(obj.namaBarang).trim(),
+        qty: qty,
+        hargaPokok: hargaPokok,
+        persediaan: isFinite(persediaan) ? persediaan : 0,
+        status: obj.status
+      };
+      row.kategori = getCategory(row);
+      rows.push(row);
+    });
+    return {rows: rows, skipped: skipped};
+  }
+
+  function handleFarmasiFile(file){
+    var reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        var data = new Uint8Array(e.target.result);
+        var wb = XLSX.read(data, {type:"array"});
+        var result = parseFarmasiWorkbook(wb);
+        if(!result.rows.length){
+          alert("Tidak ada baris data yang valid ditemukan. Pastikan file memiliki kolom 'Nama Gudang' dan 'Nama Barang'.");
+          return;
+        }
+        state.farmasi.loaded = true;
+        state.farmasi.filename = file.name;
+        state.farmasi.rows = result.rows;
+        state.farmasi.skipped = result.skipped;
+        state.farmasi.filters = {gudang:"all", kategori:"all", q:""};
+        state.farmasi.page = {gudang:1, kategori:1, detail:1};
+        state.activeTab.farmasi = "ringkasan";
+        state.farmasi.activeUploadPath = null;
+        state.farmasi.cloudStatus = "idle"; state.farmasi.cloudMessage = null;
+        render();
+      }catch(err){
+        alert("Gagal membaca file. Pastikan file berformat .xlsx, .xls, atau .csv yang valid.\n\nDetail: " + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  /* ============================= PARSING (LOGISTIK) ============================= */
+
+  function parseLogistikWorkbook(wb){
+    var sheet = wb.Sheets[wb.SheetNames[0]];
+    var raw = XLSX.utils.sheet_to_json(sheet, {defval:null});
+    if(!raw.length) return {rows:[], skipped:0};
+
+    var headerKeys = Object.keys(raw[0]);
+    var fieldByHeader = {};
+    headerKeys.forEach(function(h){
+      var norm = normalizeHeader(h);
+      if(LOG_HEADER_MAP[norm]) fieldByHeader[h] = LOG_HEADER_MAP[norm];
+    });
+
+    var rows = [];
+    var skipped = 0;
+    raw.forEach(function(r){
+      var obj = {};
+      headerKeys.forEach(function(h){
+        var field = fieldByHeader[h];
+        if(field) obj[field] = r[h];
+      });
+      if(!obj.gudang || !obj.namaBarang){ skipped++; return; }
+      var qty = Number(obj.qty)||0;
+      var hargaPokok = Number(obj.hargaPokok)||0;
+      var persediaan = (obj.persediaan!==null && obj.persediaan!==undefined && obj.persediaan!=="")
+        ? Number(obj.persediaan) : (qty*hargaPokok);
+      var row = {
+        gudang: String(obj.gudang).trim(),
+        kodeBarang: obj.kodeBarang ? String(obj.kodeBarang).trim() : null,
+        idBarang: (obj.idBarang!==null && obj.idBarang!==undefined && obj.idBarang!=="") ? obj.idBarang : null,
+        namaBarang: String(obj.namaBarang).trim(),
+        qty: qty,
+        hargaPokok: hargaPokok,
+        persediaan: isFinite(persediaan) ? persediaan : 0,
+        kategori: obj.golongan ? String(obj.golongan).trim() : "Tidak ada golongan",
+        produsen: obj.produsen || null,
+        status: obj.status
+      };
+      rows.push(row);
+    });
+    return {rows: rows, skipped: skipped};
+  }
+
+  function handleLogistikFile(file){
+    var reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        var data = new Uint8Array(e.target.result);
+        var wb = XLSX.read(data, {type:"array"});
+        var result = parseLogistikWorkbook(wb);
+        if(!result.rows.length){
+          alert("Tidak ada baris data yang valid ditemukan. Pastikan file memiliki kolom 'Gudang' dan 'Barang'.");
+          return;
+        }
+        state.logistik.loaded = true;
+        state.logistik.filename = file.name;
+        state.logistik.rows = result.rows;
+        state.logistik.skipped = result.skipped;
+        state.logistik.golonganList = Array.from(new Set(result.rows.map(function(r){return r.kategori;}))).sort();
+        state.logistik.filters = {gudang:"all", golongan:"all", q:""};
+        state.logistik.page = {gudang:1, golongan:1, detail:1};
+        state.activeTab.logistik = "ringkasan";
+        state.logistik.activeUploadPath = null;
+        state.logistik.cloudStatus = "idle"; state.logistik.cloudMessage = null;
+        render();
+      }catch(err){
+        alert("Gagal membaca file. Pastikan file berformat .xlsx, .xls, atau .csv yang valid.\n\nDetail: " + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  /* ============================= AGGREGATION (FARMASI) ============================= */
+
+  function applyFarmasiFilters(rows){
+    var f = state.farmasi.filters;
+    return rows.filter(function(r){
+      if(f.gudang!=="all" && r.gudang!==f.gudang) return false;
+      if(f.kategori!=="all" && r.kategori!==f.kategori) return false;
+      if(f.q && r.namaBarang.toLowerCase().indexOf(f.q.toLowerCase())===-1) return false;
+      return true;
+    });
+  }
+
+  function aggregateByGudang(rows){
+    var map = {};
+    rows.forEach(function(r){
+      if(!map[r.gudang]) map[r.gudang] = {gudang:r.gudang, itemSet:{}, items:0, qty:0, nilai:0};
+      var o = map[r.gudang];
+      var k = itemKey(r);
+      if(!o.itemSet[k]){ o.itemSet[k]=true; o.items++; }
+      o.qty += r.qty; o.nilai += r.persediaan;
+    });
+    return Object.keys(map).map(function(k){
+      var o = map[k];
+      var code = extractCode(o.gudang);
+      var batas = (code && BUDGET_LOOKUP.hasOwnProperty(code)) ? BUDGET_LOOKUP[code] : null;
+      var pct = (batas!==null && batas>0) ? (o.nilai/batas*100) : (batas===0 ? (o.nilai>0?9999:0) : null);
+      var status = batas===null ? "unset" : (o.nilai>batas ? "over" : "ok");
+      return {gudang:o.gudang, items:o.items, qty:o.qty, nilai:o.nilai, batas:batas, pct:pct, status:status};
+    });
+  }
+
+  function aggregateByGudangSimple(rows){
+    var map = {};
+    rows.forEach(function(r){
+      if(!map[r.gudang]) map[r.gudang] = {gudang:r.gudang, itemSet:{}, items:0, qty:0, nilai:0};
+      var o = map[r.gudang];
+      var k = itemKey(r);
+      if(!o.itemSet[k]){ o.itemSet[k]=true; o.items++; }
+      o.qty += r.qty; o.nilai += r.persediaan;
+    });
+    return Object.keys(map).map(function(k){ return map[k]; });
+  }
+
+  function aggregateByKategori(rows){
+    var map = {};
+    var total = 0;
+    rows.forEach(function(r){ total += r.persediaan; });
+    rows.forEach(function(r){
+      if(!map[r.kategori]) map[r.kategori] = {kategori:r.kategori, itemSet:{}, itemCount:0, qty:0, nilai:0};
+      var o = map[r.kategori];
+      if(!o.itemSet[itemKey(r)]){ o.itemSet[itemKey(r)]=true; o.itemCount++; }
+      o.qty += r.qty; o.nilai += r.persediaan;
+    });
+    return Object.keys(map).map(function(k){
+      var o = map[k];
+      return {kategori:o.kategori, itemCount:o.itemCount, qty:o.qty, nilai:o.nilai, share: total>0 ? (o.nilai/total*100) : 0};
+    });
+  }
+
+  function aggregateDetail(rows){
+    var map = {};
+    rows.forEach(function(r){
+      var key = itemKey(r) + "||" + r.namaBarang;
+      if(!map[key]) map[key] = {key:itemKey(r), namaBarang:r.namaBarang, kategori:r.kategori, qty:0, nilai:0, gudangSet:{}, gudangCount:0};
+      var o = map[key];
+      o.qty += r.qty; o.nilai += r.persediaan;
+      if(!o.gudangSet[r.gudang]){ o.gudangSet[r.gudang]=true; o.gudangCount++; }
+    });
+    return Object.keys(map).map(function(k){ return map[k]; });
+  }
+
+  function applyLogistikFilters(rows){
+    var f = state.logistik.filters;
+    return rows.filter(function(r){
+      if(f.gudang!=="all" && r.gudang!==f.gudang) return false;
+      if(f.golongan!=="all" && r.kategori!==f.golongan) return false;
+      if(f.q && r.namaBarang.toLowerCase().indexOf(f.q.toLowerCase())===-1) return false;
+      return true;
+    });
+  }
+
+  /* ============================= CHARTS ============================= */
+
+  var charts = {};
+  var CHART_PALETTE = ["#2F6F5E","#C97A2B","#B3432B","#2F8F5B","#6B5CA5","#3E7CB1","#8A8F98"];
+
+  function cssVar(name){
+    var v = getComputedStyle(document.documentElement).getPropertyValue(name);
+    return v ? v.trim() : "#999";
+  }
+  function destroyChart(id){
+    if(charts[id]){ try{ charts[id].destroy(); }catch(e){} delete charts[id]; }
+  }
+  function destroyAllCharts(){
+    Object.keys(charts).forEach(destroyChart);
+  }
+
+  function renderFarmasiRingkasanCharts(rows){
+    if(typeof Chart === "undefined") return;
+    var gudangAgg = sortRows(aggregateByGudang(rows), "nilai", "desc").slice(0,10);
+    var elG = document.getElementById("chartFarmasiGudang");
+    if(elG){
+      charts.chartFarmasiGudang = new Chart(elG.getContext("2d"), {
+        type:"bar",
+        data:{
+          labels: gudangAgg.map(function(g){return g.gudang;}),
+          datasets:[{ label:"Nilai persediaan", data: gudangAgg.map(function(g){return g.nilai;}), backgroundColor: cssVar("--accent"), borderRadius:4 }]
+        },
+        options:{
+          indexAxis:"y", responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:function(c){ return fmtRupiah(c.parsed.x); } } } },
+          scales:{
+            x:{ ticks:{ callback:function(v){return fmtRupiah(v);}, color:cssVar("--text-secondary") }, grid:{color:cssVar("--border")} },
+            y:{ ticks:{ color:cssVar("--text-secondary"), font:{size:11} }, grid:{display:false} }
+          }
+        }
+      });
+    }
+    var kategoriAgg = sortRows(aggregateByKategori(rows), "nilai", "desc");
+    var elK = document.getElementById("chartFarmasiKategori");
+    if(elK){
+      charts.chartFarmasiKategori = new Chart(elK.getContext("2d"), {
+        type:"doughnut",
+        data:{
+          labels: kategoriAgg.map(function(k){return k.kategori;}),
+          datasets:[{ data: kategoriAgg.map(function(k){return k.nilai;}), backgroundColor: CHART_PALETTE, borderColor: cssVar("--surface"), borderWidth:2 }]
+        },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          plugins:{
+            legend:{ position:"bottom", labels:{ color:cssVar("--text-secondary"), boxWidth:11, font:{size:11} } },
+            tooltip:{ callbacks:{ label:function(c){ return c.label+": "+fmtRupiah(c.parsed); } } }
+          }
+        }
+      });
+    }
+  }
+
+  function renderLogistikRingkasanCharts(rows){
+    if(typeof Chart === "undefined") return;
+    var gudangAgg = sortRows(aggregateByGudangSimple(rows), "nilai", "desc").slice(0,10);
+    var elG = document.getElementById("chartLogistikGudang");
+    if(elG){
+      charts.chartLogistikGudang = new Chart(elG.getContext("2d"), {
+        type:"bar",
+        data:{
+          labels: gudangAgg.map(function(g){return g.gudang;}),
+          datasets:[{ label:"Nilai persediaan", data: gudangAgg.map(function(g){return g.nilai;}), backgroundColor: cssVar("--accent"), borderRadius:4 }]
+        },
+        options:{
+          indexAxis:"y", responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:function(c){ return fmtRupiah(c.parsed.x); } } } },
+          scales:{
+            x:{ ticks:{ callback:function(v){return fmtRupiah(v);}, color:cssVar("--text-secondary") }, grid:{color:cssVar("--border")} },
+            y:{ ticks:{ color:cssVar("--text-secondary"), font:{size:11} }, grid:{display:false} }
+          }
+        }
+      });
+    }
+    var golonganAgg = sortRows(aggregateByKategori(rows), "nilai", "desc");
+    var elK = document.getElementById("chartLogistikGolongan");
+    if(elK){
+      charts.chartLogistikGolongan = new Chart(elK.getContext("2d"), {
+        type:"doughnut",
+        data:{
+          labels: golonganAgg.map(function(k){return k.kategori;}),
+          datasets:[{ data: golonganAgg.map(function(k){return k.nilai;}), backgroundColor: CHART_PALETTE.concat(CHART_PALETTE), borderColor: cssVar("--surface"), borderWidth:2 }]
+        },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          plugins:{
+            legend:{ position:"bottom", labels:{ color:cssVar("--text-secondary"), boxWidth:11, font:{size:10} } },
+            tooltip:{ callbacks:{ label:function(c){ return c.label+": "+fmtRupiah(c.parsed); } } }
+          }
+        }
+      });
+    }
+  }
+
+  function renderRingkasanCharts(){
+    if(state.currentModule==="farmasi" && state.activeTab.farmasi==="ringkasan" && state.farmasi.loaded){
+      renderFarmasiRingkasanCharts(applyFarmasiFilters(state.farmasi.rows));
+    } else if(state.currentModule==="logistik" && state.activeTab.logistik==="ringkasan" && state.logistik.loaded){
+      renderLogistikRingkasanCharts(applyLogistikFilters(state.logistik.rows));
+    }
+  }
+
+  /* ============================= RENDER: SHELL ============================= */
+
+  function render(){
+    destroyAllCharts();
+    var app = document.getElementById("app");
+    var gearHtml = '<div class="settings-gear" data-action="open-settings">⚙️ '+(ghConfigured()?esc(ghConfig.owner+"/"+ghConfig.repo):"Atur GitHub")+'</div>';
+    app.innerHTML = gearHtml + renderSidebar() + renderMain() + renderSettingsModal();
+    bindGlobalEvents();
+    renderRingkasanCharts();
+  }
+
+  function navItem(module, tab, icon, label, enabled){
+    var isActive = state.currentModule===module && state.activeTab[module]===tab;
+    var cls = "nav-item" + (isActive?" active":"") + (enabled?"":" disabled");
+    return '<div class="'+cls+'" data-action="nav" data-module="'+module+'" data-tab="'+tab+'">'+
+      '<span class="ic">'+icon+'</span><span>'+esc(label)+'</span></div>';
+  }
+
+  function renderSidebar(){
+    var m = state.currentModule;
+    var farmasiOn = true;
+    var logistikOn = true; // generic module always usable, richer tabs gated on loaded data
+    var html = '';
+    html += '<div class="sidebar">';
+    html += '<div class="brand"><div class="brand-mark">💊</div><div class="brand-name">Kendali Stok</div><div class="brand-sub">Farmasi & Logistik</div></div>';
+    html += '<div class="module-switch">';
+    html += '<button class="module-btn'+(m==="farmasi"?" active":"")+'" data-action="switch-module" data-module="farmasi">Farmasi</button>';
+    html += '<button class="module-btn'+(m==="logistik"?" active":"")+'" data-action="switch-module" data-module="logistik">Logistik</button>';
+    html += '</div>';
+
+    if(m==="farmasi"){
+      var fl = state.farmasi.loaded;
+      html += '<div class="nav-group-label">Modul farmasi</div>';
+      html += navItem("farmasi","ringkasan","◆","Ringkasan", true);
+      html += navItem("farmasi","import","⇪","Import data", true);
+      html += navItem("farmasi","riwayat","🕓","Riwayat upload", true);
+      html += navItem("farmasi","gudang","▤","Rekap per gudang", fl);
+      html += navItem("farmasi","kategori","▦","Rekap per kategori", fl);
+      html += navItem("farmasi","detail","☰","Detail barang", fl);
+    } else {
+      var ll = state.logistik.loaded;
+      html += '<div class="nav-group-label">Modul logistik</div>';
+      html += navItem("logistik","ringkasan","◆","Ringkasan", true);
+      html += navItem("logistik","import","⇪","Import data", true);
+      html += navItem("logistik","riwayat","🕓","Riwayat upload", true);
+      html += navItem("logistik","gudang","▤","Rekap per gudang", ll);
+      html += navItem("logistik","golongan","▦","Rekap per golongan", ll);
+      html += navItem("logistik","detail","☰","Detail barang", ll);
+    }
+
+    html += '<div class="sidebar-foot">Kategori barang dapat disesuaikan manual di tab Detail barang, tersimpan otomatis di perangkat ini.</div>';
+    html += '</div>';
+    return html;
+  }
+
+  /* ============================= RENDER: MAIN ============================= */
+
+  function renderMain(){
+    var m = state.currentModule;
+    var tab = state.activeTab[m];
+    var html = '<div class="main">';
+    html += renderTopbar(m, tab);
+    if(m==="farmasi" && state.farmasi.loaded && tab!=="import"){
+      html += renderFarmasiFilterbar();
+    }
+    if(m==="logistik" && state.logistik.loaded && tab!=="import"){
+      html += renderLogistikFilterbar();
+    }
+    html += '<div class="content">';
+    if(m==="farmasi"){
+      if(tab==="ringkasan") html += renderFarmasiRingkasan();
+      else if(tab==="import") html += renderFarmasiImport();
+      else if(tab==="riwayat") html += renderUploadHistory("farmasi");
+      else if(tab==="gudang") html += renderFarmasiGudang();
+      else if(tab==="kategori") html += renderFarmasiKategori();
+      else if(tab==="detail") html += renderFarmasiDetail();
+    } else {
+      if(tab==="ringkasan") html += renderLogistikRingkasan();
+      else if(tab==="import") html += renderLogistikImport();
+      else if(tab==="riwayat") html += renderUploadHistory("logistik");
+      else if(tab==="gudang") html += renderLogistikGudang();
+      else if(tab==="golongan") html += renderLogistikGolongan();
+      else if(tab==="detail") html += renderLogistikDetail();
+    }
+    html += '</div></div>';
+    return html;
+  }
+
+  function renderTopbar(m, tab){
+    var titles = {
+      farmasi:{ ringkasan:"Ringkasan farmasi", import:"Import data farmasi", riwayat:"Riwayat upload farmasi", gudang:"Rekap per gudang", kategori:"Rekap per kategori", detail:"Detail barang" },
+      logistik:{ ringkasan:"Ringkasan logistik", import:"Import data logistik", riwayat:"Riwayat upload logistik", gudang:"Rekap per gudang", golongan:"Rekap per golongan", detail:"Detail barang" }
+    };
+    var subs = {
+      farmasi: state.farmasi.loaded ? ('File: '+esc(state.farmasi.filename)) : "Belum ada data — mulai dari Import data",
+      logistik: state.logistik.loaded ? ('File: '+esc(state.logistik.filename)) : "Belum ada data — mulai dari Import data"
+    };
+    var html = '<div class="topbar">';
+    html += '<div><h1>'+esc(titles[m][tab])+'</h1><div class="sub">'+subs[m]+'</div></div>';
+    html += '<div class="topbar-right">';
+    if(m==="farmasi"){
+      html += state.farmasi.loaded
+        ? '<span class="badge badge-ok">'+fmtNum(state.farmasi.rows.length)+' baris dimuat</span>'
+        : '<span class="badge badge-off">Belum ada data</span>';
+    } else {
+      html += state.logistik.loaded
+        ? '<span class="badge badge-ok">'+fmtNum(state.logistik.rows.length)+' baris dimuat</span>'
+        : '<span class="badge badge-off">Belum ada data</span>';
+    }
+    html += '</div></div>';
+    return html;
+  }
+
+  function renderFarmasiFilterbar(){
+    var rows = state.farmasi.rows;
+    var gudangList = Array.from(new Set(rows.map(function(r){return r.gudang;}))).sort();
+    var f = state.farmasi.filters;
+    var html = '<div class="filterbar">';
+    html += '<div class="filter-field"><label>Gudang</label><select data-action="filter-farmasi" data-key="gudang">';
+    html += '<option value="all"'+(f.gudang==="all"?" selected":"")+'>Semua gudang</option>';
+    gudangList.forEach(function(g){ html += '<option value="'+esc(g)+'"'+(f.gudang===g?" selected":"")+'>'+esc(g)+'</option>'; });
+    html += '</select></div>';
+
+    html += '<div class="filter-field"><label>Kategori</label><select data-action="filter-farmasi" data-key="kategori">';
+    html += '<option value="all"'+(f.kategori==="all"?" selected":"")+'>Semua kategori</option>';
+    CATEGORIES.forEach(function(c){ html += '<option value="'+esc(c)+'"'+(f.kategori===c?" selected":"")+'>'+esc(c)+'</option>'; });
+    html += '</select></div>';
+
+    html += '<div class="filter-field"><label>Cari nama barang</label><input type="text" data-action="search-farmasi" placeholder="Contoh: paracetamol" value="'+esc(f.q)+'"></div>';
+    html += '<button class="btn btn-reset" data-action="reset-farmasi-filter">Reset filter</button>';
+    html += '</div>';
+    return html;
+  }
+
+  function renderLogistikFilterbar(){
+    var rows = state.logistik.rows;
+    var gudangList = Array.from(new Set(rows.map(function(r){return r.gudang;}))).sort();
+    var f = state.logistik.filters;
+    var html = '<div class="filterbar">';
+    html += '<div class="filter-field"><label>Gudang</label><select data-action="filter-logistik" data-key="gudang">';
+    html += '<option value="all"'+(f.gudang==="all"?" selected":"")+'>Semua gudang</option>';
+    gudangList.forEach(function(g){ html += '<option value="'+esc(g)+'"'+(f.gudang===g?" selected":"")+'>'+esc(g)+'</option>'; });
+    html += '</select></div>';
+
+    html += '<div class="filter-field"><label>Golongan</label><select data-action="filter-logistik" data-key="golongan">';
+    html += '<option value="all"'+(f.golongan==="all"?" selected":"")+'>Semua golongan</option>';
+    state.logistik.golonganList.forEach(function(g){ html += '<option value="'+esc(g)+'"'+(f.golongan===g?" selected":"")+'>'+esc(g)+'</option>'; });
+    html += '</select></div>';
+
+    html += '<div class="filter-field"><label>Cari nama barang</label><input type="text" data-action="search-logistik" placeholder="Contoh: kasa" value="'+esc(f.q)+'"></div>';
+    html += '<button class="btn btn-reset" data-action="reset-logistik-filter">Reset filter</button>';
+    html += '</div>';
+    return html;
+  }
+
+  /* ============================= FARMASI: RINGKASAN ============================= */
+
+  function renderFarmasiRingkasan(){
+    if(!state.farmasi.loaded) return emptyState("💊","Belum ada data farmasi","Import file Excel stok farmasi untuk melihat ringkasan, rekap gudang, rekap kategori, dan detail barang.","import","farmasi");
+    var rows = applyFarmasiFilters(state.farmasi.rows);
+    var totalNilai = 0, totalQty = 0;
+    rows.forEach(function(r){ totalNilai+=r.persediaan; totalQty+=r.qty; });
+    var gudangAgg = aggregateByGudang(rows);
+    var kategoriAgg = aggregateByKategori(rows);
+    var overCount = gudangAgg.filter(function(g){return g.status==="over";}).length;
+    var uniqueItems = Object.keys(rows.reduce(function(acc,r){acc[itemKey(r)]=1;return acc;},{})).length;
+
+    var html = '';
+    html += filterNote(state.farmasi.filters, "gudang", "kategori");
+    html += '<div class="stat-row">';
+    html += statCard("Total nilai persediaan", fmtRupiah(totalNilai), rows.length+" baris data", true);
+    html += statCard("Jumlah gudang", fmtNum(gudangAgg.length), "gudang tercatat di data");
+    html += statCard("Item unik", fmtNum(uniqueItems), "nama/kode barang berbeda");
+    html += statCard("Gudang melebihi batas", fmtNum(overCount), overCount>0 ? "perlu perhatian" : "semua dalam batas");
+    html += '</div>';
+
+    var topGudang = sortRows(gudangAgg, "nilai", "desc").slice(0,6);
+    var maxGudangNilai = topGudang.length ? topGudang[0].nilai : 1;
+    var topKategori = sortRows(kategoriAgg, "nilai", "desc");
+    var maxKatNilai = topKategori.length ? topKategori[0].nilai : 1;
+
+    html += '<div class="two-col">';
+    html += '<div class="panel"><h3>Gudang dengan nilai persediaan tertinggi</h3>';
+    topGudang.forEach(function(g){
+      html += barRow(g.gudang, g.nilai, maxGudangNilai, fmtRupiah(g.nilai));
+    });
+    html += '<div class="note">Lihat tab "Rekap per gudang" untuk perbandingan dengan batas maksimal.</div>';
+    html += '</div>';
+
+    html += '<div class="panel"><h3>Distribusi nilai per kategori</h3>';
+    topKategori.forEach(function(k){
+      html += barRow(k.kategori, k.nilai, maxKatNilai, fmtRupiah(k.nilai)+" · "+fmtPct(k.share));
+    });
+    html += '</div>';
+    html += '</div>';
+
+    html += '<div class="two-col">';
+    html += '<div class="panel"><h3>Grafik nilai persediaan per gudang</h3><div class="chart-box"><canvas id="chartFarmasiGudang"></canvas></div></div>';
+    html += '<div class="panel"><h3>Grafik distribusi nilai per kategori</h3><div class="chart-box"><canvas id="chartFarmasiKategori"></canvas></div></div>';
+    html += '</div>';
+
+    if(state.farmasi.skipped>0){
+      html += '<div class="warn-box">'+fmtNum(state.farmasi.skipped)+' baris dilewati karena kolom Nama Gudang atau Nama Barang kosong.</div>';
+    }
+    return html;
+  }
+
+  function statCard(label, value, foot, accent){
+    return '<div class="stat-card'+(accent?" accent":"")+'"><div class="label">'+esc(label)+'</div><div class="value">'+value+'</div><div class="foot">'+esc(foot)+'</div></div>';
+  }
+  function filterNote(filters, gudangKey, catKey){
+    var parts = [];
+    if(filters.gudang && filters.gudang!=="all") parts.push("Gudang: "+filters.gudang);
+    if(filters[catKey] && filters[catKey]!=="all") parts.push((catKey==="golongan"?"Golongan":"Kategori")+": "+filters[catKey]);
+    if(filters.q) parts.push('Pencarian: "'+filters.q+'"');
+    if(!parts.length) return "";
+    return '<div class="filter-note">📌 Ringkasan &amp; grafik di bawah mengikuti filter aktif — '+esc(parts.join(" · "))+'. <span class="link-action" data-action="reset-'+(catKey==="golongan"?"logistik":"farmasi")+'-filter">Reset filter</span></div>';
+  }
+  function barRow(name, val, max, valLabel){
+    var pct = max>0 ? Math.max(2, Math.min(100, val/max*100)) : 0;
+    return '<div class="mini-bar-row"><div class="name" title="'+esc(name)+'">'+esc(name)+'</div>'+
+      '<div class="mini-bar-track"><div class="mini-bar-fill" style="width:'+pct+'%"></div></div>'+
+      '<div class="mini-bar-val">'+valLabel+'</div></div>';
+  }
+  function emptyState(icon, title, hint, tab, module){
+    return '<div class="empty-state"><div class="ic">'+icon+'</div><div class="title">'+esc(title)+'</div>'+
+      '<div>'+esc(hint)+' <span class="link-action" data-action="nav" data-module="'+module+'" data-tab="'+tab+'">Buka import data</span></div></div>';
+  }
+
+  /* ============================= FARMASI: IMPORT ============================= */
+
+  function renderFarmasiImport(){
+    var html = '<div class="import-shell">';
+    html += cloudBanner("farmasi");
+    html += '<p class="lede">Import file stok farmasi (.xlsx / .xls / .csv) dengan kolom seperti: ID Gudang, Nama Gudang, Kode Barang, Nama Barang, Qty, Harga Pokok, Persediaan. Kolom lain akan diabaikan secara otomatis.</p>';
+    html += '<div class="dropzone" id="dz-farmasi" data-action="pick-farmasi">';
+    html += '<div class="ic">⇪</div><div class="title">Tarik file ke sini atau klik untuk memilih</div>';
+    html += '<div class="hint">Mendukung .xlsx, .xls, dan .csv</div>';
+    html += '</div>';
+    html += '<input type="file" id="file-farmasi" accept=".xlsx,.xls,.csv">';
+
+    if(state.farmasi.loaded){
+      var r = state.farmasi.rows;
+      var totalNilai = r.reduce(function(a,x){return a+x.persediaan;},0);
+      html += '<div class="import-summary">';
+      html += '<div class="row"><span>File aktif</span><span class="v">'+esc(state.farmasi.filename)+'</span></div>';
+      html += '<div class="row"><span>Baris data</span><span class="v">'+fmtNum(r.length)+'</span></div>';
+      html += '<div class="row"><span>Baris dilewati</span><span class="v">'+fmtNum(state.farmasi.skipped)+'</span></div>';
+      html += '<div class="row"><span>Total nilai persediaan</span><span class="v">'+fmtRupiah(totalNilai)+'</span></div>';
+      html += '</div>';
+      html += '<div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">';
+      html += '<button class="btn btn-save" data-action="save-farmasi" '+(state.farmasi.cloudStatus==="saving"?"disabled":"")+'>💾 '+(state.farmasi.cloudStatus==="saving"?"Menyimpan…":"Simpan ke GitHub")+'</button>';
+      html += '<button class="btn" data-action="clear-farmasi">Hapus dari tampilan ini</button>';
+      html += '</div>';
+      if(!ghConfigured()) html += '<div class="note">Atur GitHub dulu (tombol ⚙️ di kanan atas) supaya tombol simpan ini aktif.</div>';
+    }
+    html += '<div class="note">Kategori barang ditentukan otomatis dari angka pertama pada nama barang (atau kode barang jika nama tidak diawali angka): 1 Tablet, 2 Syrup, 3 Injeksi, 4 Salep, 5 Chemicellien, 6 &amp; 7 Alkes, selain itu Lain-lain. Kategori bisa diubah manual per item di tab Detail barang.</div>';
+    html += '</div>';
+    return html;
+  }
+
+  /* ============================= FARMASI: GUDANG ============================= */
+
+  function renderFarmasiGudang(){
+    if(!state.farmasi.loaded) return emptyState("▤","Belum ada data farmasi","Import data terlebih dahulu untuk melihat rekap per gudang.","import","farmasi");
+    var filtered = applyFarmasiFilters(state.farmasi.rows);
+    var agg = aggregateByGudang(filtered);
+    var s = state.farmasi.sort.gudang;
+    agg = sortRows(agg, s.key, s.dir);
+
+    var totalAll = agg.reduce(function(a,g){return a+g.nilai;},0);
+
+    var html = '<p class="lede">Total nilai persediaan per gudang, dibandingkan dengan batas maksimal yang ditetapkan.</p>';
+    html += '<div class="legend"><span><i style="background:var(--success)"></i>Dalam batas</span><span><i style="background:var(--danger)"></i>Melebihi batas</span><span><i style="background:var(--text-secondary)"></i>Belum ada batas ditetapkan</span></div>';
+
+    html += '<div class="table-wrap"><table><thead><tr>';
+    html += th("gudang","Gudang","left",s);
+    html += th("items","Jml item","num",s);
+    html += th("qty","Total qty","num",s);
+    html += th("nilai","Nilai persediaan","num",s);
+    html += th("batas","Batas maksimal","num",s);
+    html += th("pct","% terpakai","num",s);
+    html += '<th class="center">Status</th>';
+    html += '</tr></thead><tbody>';
+
+    var page = state.farmasi.page.gudang, pageSize = state.farmasi.pageSize.gudang;
+    var pageRows = paginate(agg, page, pageSize);
+    if(!pageRows.length){
+      html += '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-secondary)">Tidak ada data untuk filter ini.</td></tr>';
+    }
+    pageRows.forEach(function(g){
+      html += '<tr>';
+      html += '<td class="name-cell"><div class="name-primary">'+esc(g.gudang)+'</div></td>';
+      html += '<td class="num">'+fmtNum(g.items)+'</td>';
+      html += '<td class="num">'+fmtNum(g.qty)+'</td>';
+      html += '<td class="num">'+fmtRupiah(g.nilai)+'</td>';
+      html += '<td class="num">'+(g.batas===null ? '<span style="color:var(--text-secondary)">-</span>' : fmtRupiah(g.batas))+'</td>';
+      html += '<td class="num">'+(g.pct===null ? '-' : fmtPct(g.pct))+'</td>';
+      html += '<td class="center">'+statusPill(g.status)+'</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    html += tableFoot(agg.length, page, pageSize, "gudang");
+    html += '</div>';
+
+    html += '<div class="note">Total nilai persediaan gudang pada hasil filter saat ini: <strong class="num">'+fmtRupiah(totalAll)+'</strong></div>';
+    return html;
+  }
+
+  function statusPill(status){
+    if(status==="over") return '<span class="pill pill-over">Melebihi batas</span>';
+    if(status==="ok") return '<span class="pill pill-ok">Dalam batas</span>';
+    return '<span class="pill pill-unset">Belum ada batas</span>';
+  }
+
+  /* ============================= FARMASI: KATEGORI ============================= */
+
+  function renderFarmasiKategori(){
+    if(!state.farmasi.loaded) return emptyState("▦","Belum ada data farmasi","Import data terlebih dahulu untuk melihat rekap per kategori.","import","farmasi");
+    var filtered = applyFarmasiFilters(state.farmasi.rows);
+    var agg = aggregateByKategori(filtered);
+    var s = state.farmasi.sort.kategori;
+    agg = sortRows(agg, s.key, s.dir);
+
+    var html = '<p class="lede">Rekap barang berdasarkan kategori: Tablet, Syrup, Injeksi, Salep, Chemicellien, Alkes, dan Lain-lain. Kategori ditentukan otomatis dari angka pertama pada nama/kode barang (1 Tablet, 2 Syrup, 3 Injeksi, 4 Salep, 5 Chemicellien, 6 &amp; 7 Alkes) dan dapat dikoreksi manual di tab Detail barang.</p>';
+
+    html += '<div class="table-wrap"><table><thead><tr>';
+    html += th("kategori","Kategori","left",s);
+    html += th("itemCount","Item unik","num",s);
+    html += th("qty","Total qty","num",s);
+    html += th("nilai","Nilai persediaan","num",s);
+    html += th("share","% dari total","num",s);
+    html += '</tr></thead><tbody>';
+
+    var page = state.farmasi.page.kategori, pageSize = state.farmasi.pageSize.kategori;
+    var pageRows = paginate(agg, page, pageSize);
+    if(!pageRows.length){
+      html += '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-secondary)">Tidak ada data untuk filter ini.</td></tr>';
+    }
+    pageRows.forEach(function(k){
+      html += '<tr>';
+      html += '<td class="name-cell"><div class="name-primary">'+esc(k.kategori)+'</div></td>';
+      html += '<td class="num">'+fmtNum(k.itemCount)+'</td>';
+      html += '<td class="num">'+fmtNum(k.qty)+'</td>';
+      html += '<td class="num">'+fmtRupiah(k.nilai)+'</td>';
+      html += '<td class="num">'+fmtPct(k.share)+'</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    html += tableFoot(agg.length, page, pageSize, "kategori");
+    html += '</div>';
+    return html;
+  }
+
+  /* ============================= FARMASI: DETAIL ============================= */
+
+  function renderFarmasiDetail(){
+    if(!state.farmasi.loaded) return emptyState("☰","Belum ada data farmasi","Import data terlebih dahulu untuk melihat detail barang.","import","farmasi");
+    var filtered = applyFarmasiFilters(state.farmasi.rows);
+    var agg = aggregateDetail(filtered);
+    var s = state.farmasi.sort.detail;
+    agg = sortRows(agg, s.key, s.dir);
+
+    var html = '<p class="lede">Detail nama barang dan total nilai persediaan, dijumlahkan sesuai gudang dan kategori yang sedang difilter. Ubah kategori langsung dari dropdown bila hasil deteksi otomatis kurang tepat.</p>';
+
+    html += '<div class="table-wrap"><table><thead><tr>';
+    html += th("namaBarang","Nama barang","left",s);
+    html += '<th>Kategori</th>';
+    html += th("gudangCount","Jml gudang","num",s);
+    html += th("qty","Total qty","num",s);
+    html += th("nilai","Total nilai persediaan","num",s);
+    html += '</tr></thead><tbody>';
+
+    var page = state.farmasi.page.detail, pageSize = state.farmasi.pageSize.detail;
+    var pageRows = paginate(agg, page, pageSize);
+    if(!pageRows.length){
+      html += '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-secondary)">Tidak ada data untuk filter ini.</td></tr>';
+    }
+    pageRows.forEach(function(it){
+      html += '<tr>';
+      html += '<td class="name-cell"><div class="name-primary">'+esc(it.namaBarang)+'</div>'+(it.key?'<div class="name-secondary">'+esc(it.key)+'</div>':'')+'</td>';
+      html += '<td><select class="cat-select" data-action="override-category" data-key="'+esc(it.key)+'">';
+      CATEGORIES.forEach(function(c){ html += '<option value="'+esc(c)+'"'+(it.kategori===c?" selected":"")+'>'+esc(c)+'</option>'; });
+      html += '</select></td>';
+      html += '<td class="num">'+fmtNum(it.gudangCount)+'</td>';
+      html += '<td class="num">'+fmtNum(it.qty)+'</td>';
+      html += '<td class="num">'+fmtRupiah(it.nilai)+'</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    html += tableFoot(agg.length, page, pageSize, "detail");
+    html += '</div>';
+    return html;
+  }
+
+  function th(key, label, align, sortState){
+    var isActive = sortState.key===key;
+    var arrow = isActive ? (sortState.dir==="asc" ? "▲" : "▼") : "";
+    var cls = "sortable" + (align==="num" ? " num" : "");
+    return '<th class="'+cls+'" data-action="sort" data-key="'+key+'">'+esc(label)+(arrow?' <span class="arrow">'+arrow+'</span>':'')+'</th>';
+  }
+
+  function tableFoot(total, page, pageSize, scope){
+    var totalPages = Math.max(1, Math.ceil(total/pageSize));
+    var html = '<div class="table-foot">';
+    html += '<div>Menampilkan '+fmtNum(Math.min(total,(page-1)*pageSize+1))+'–'+fmtNum(Math.min(total,page*pageSize))+' dari '+fmtNum(total)+' baris</div>';
+    html += '<div class="pager">';
+    html += '<select data-action="pagesize" data-scope="'+scope+'">';
+    [25,50,100,200].forEach(function(n){ html += '<option value="'+n+'"'+(pageSize===n?" selected":"")+'>'+n+' / halaman</option>'; });
+    html += '</select>';
+    html += '<button data-action="page-prev" data-scope="'+scope+'" '+(page<=1?"disabled":"")+'>‹ Sebelumnya</button>';
+    html += '<span>Hal '+page+' / '+totalPages+'</span>';
+    html += '<button data-action="page-next" data-scope="'+scope+'" '+(page>=totalPages?"disabled":"")+'>Berikutnya ›</button>';
+    html += '</div></div>';
+    return html;
+  }
+
+  /* ============================= LOGISTIK: RINGKASAN ============================= */
+
+  function renderLogistikRingkasan(){
+    if(!state.logistik.loaded) return emptyState("📦","Belum ada data logistik","Import file Excel stok logistik untuk melihat ringkasan, rekap gudang, rekap golongan, dan detail barang.","import","logistik");
+    var rows = applyLogistikFilters(state.logistik.rows);
+    var totalNilai = 0, totalQty = 0;
+    rows.forEach(function(r){ totalNilai+=r.persediaan; totalQty+=r.qty; });
+    var gudangAgg = aggregateByGudangSimple(rows);
+    var golonganAgg = aggregateByKategori(rows);
+    var uniqueItems = Object.keys(rows.reduce(function(acc,r){acc[itemKey(r)]=1;return acc;},{})).length;
+
+    var html = '';
+    html += filterNote(state.logistik.filters, "gudang", "golongan");
+    html += '<div class="stat-row">';
+    html += statCard("Total nilai persediaan", fmtRupiah(totalNilai), rows.length+" baris data", true);
+    html += statCard("Jumlah gudang", fmtNum(gudangAgg.length), "gudang tercatat di data");
+    html += statCard("Item unik", fmtNum(uniqueItems), "nama/kode barang berbeda");
+    html += statCard("Jumlah golongan", fmtNum(golonganAgg.length), "golongan barang");
+    html += '</div>';
+
+    var topGudang = sortRows(gudangAgg, "nilai", "desc").slice(0,6);
+    var maxGudangNilai = topGudang.length ? topGudang[0].nilai : 1;
+    var topGolongan = sortRows(golonganAgg, "nilai", "desc");
+    var maxGolNilai = topGolongan.length ? topGolongan[0].nilai : 1;
+
+    html += '<div class="two-col">';
+    html += '<div class="panel"><h3>Gudang dengan nilai persediaan tertinggi</h3>';
+    topGudang.forEach(function(g){
+      html += barRow(g.gudang, g.nilai, maxGudangNilai, fmtRupiah(g.nilai));
+    });
+    html += '<div class="note">Lihat tab "Rekap per gudang" untuk daftar lengkap.</div>';
+    html += '</div>';
+
+    html += '<div class="panel"><h3>Distribusi nilai per golongan</h3>';
+    topGolongan.forEach(function(k){
+      html += barRow(k.kategori, k.nilai, maxGolNilai, fmtRupiah(k.nilai)+" · "+fmtPct(k.share));
+    });
+    html += '</div>';
+    html += '</div>';
+
+    html += '<div class="two-col">';
+    html += '<div class="panel"><h3>Grafik nilai persediaan per gudang</h3><div class="chart-box"><canvas id="chartLogistikGudang"></canvas></div></div>';
+    html += '<div class="panel"><h3>Grafik distribusi nilai per golongan</h3><div class="chart-box"><canvas id="chartLogistikGolongan"></canvas></div></div>';
+    html += '</div>';
+
+    if(state.logistik.skipped>0){
+      html += '<div class="warn-box">'+fmtNum(state.logistik.skipped)+' baris dilewati karena kolom Gudang atau Barang kosong.</div>';
+    }
+    return html;
+  }
+
+  /* ============================= LOGISTIK: IMPORT ============================= */
+
+  function renderLogistikImport(){
+    var html = '<div class="import-shell">';
+    html += cloudBanner("logistik");
+    html += '<p class="lede">Import file stok logistik (.xlsx / .xls / .csv) dengan kolom seperti: Barang, Kode Barang, Gudang, Golongan, Qty, Harga Pokok, Persediaan, Produsen. Kolom lain akan diabaikan secara otomatis.</p>';
+    html += '<div class="dropzone" id="dz-logistik" data-action="pick-logistik">';
+    html += '<div class="ic">⇪</div><div class="title">Tarik file ke sini atau klik untuk memilih</div>';
+    html += '<div class="hint">Mendukung .xlsx, .xls, dan .csv</div>';
+    html += '</div>';
+    html += '<input type="file" id="file-logistik" accept=".xlsx,.xls,.csv">';
+
+    if(state.logistik.loaded){
+      var r = state.logistik.rows;
+      var totalNilai = r.reduce(function(a,x){return a+x.persediaan;},0);
+      html += '<div class="import-summary">';
+      html += '<div class="row"><span>File aktif</span><span class="v">'+esc(state.logistik.filename)+'</span></div>';
+      html += '<div class="row"><span>Baris data</span><span class="v">'+fmtNum(r.length)+'</span></div>';
+      html += '<div class="row"><span>Baris dilewati</span><span class="v">'+fmtNum(state.logistik.skipped)+'</span></div>';
+      html += '<div class="row"><span>Total nilai persediaan</span><span class="v">'+fmtRupiah(totalNilai)+'</span></div>';
+      html += '</div>';
+      html += '<div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">';
+      html += '<button class="btn btn-save" data-action="save-logistik" '+(state.logistik.cloudStatus==="saving"?"disabled":"")+'>💾 '+(state.logistik.cloudStatus==="saving"?"Menyimpan…":"Simpan ke GitHub")+'</button>';
+      html += '<button class="btn" data-action="clear-logistik">Hapus dari tampilan ini</button>';
+      html += '</div>';
+      if(!ghConfigured()) html += '<div class="note">Atur GitHub dulu (tombol ⚙️ di kanan atas) supaya tombol simpan ini aktif.</div>';
+    }
+    html += '<div class="note">Rekap per gudang, per golongan, dan detail barang tersedia otomatis setelah data dimuat, mengikuti pola yang sama seperti modul farmasi.</div>';
+    html += '</div>';
+    return html;
+  }
+
+  /* ============================= LOGISTIK: GUDANG ============================= */
+
+  function renderLogistikGudang(){
+    if(!state.logistik.loaded) return emptyState("▤","Belum ada data logistik","Import data terlebih dahulu untuk melihat rekap per gudang.","import","logistik");
+    var filtered = applyLogistikFilters(state.logistik.rows);
+    var agg = aggregateByGudangSimple(filtered);
+    var s = state.logistik.sort.gudang;
+    agg = sortRows(agg, s.key, s.dir);
+
+    var totalAll = agg.reduce(function(a,g){return a+g.nilai;},0);
+
+    var html = '<p class="lede">Total nilai persediaan logistik per gudang. Jml item dihitung berdasarkan ID Barang unik (bukan jumlah baris/lokasi), karena Kode Barang pada data logistik tidak unik per barang.</p>';
+
+    html += '<div class="table-wrap"><table><thead><tr>';
+    html += th2("gudang","Gudang","left",s,"logistik");
+    html += th2("items","Jml item","num",s,"logistik");
+    html += th2("qty","Total qty","num",s,"logistik");
+    html += th2("nilai","Nilai persediaan","num",s,"logistik");
+    html += '</tr></thead><tbody>';
+
+    var page = state.logistik.page.gudang, pageSize = state.logistik.pageSize.gudang;
+    var pageRows = paginate(agg, page, pageSize);
+    if(!pageRows.length){
+      html += '<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--text-secondary)">Tidak ada data untuk filter ini.</td></tr>';
+    }
+    pageRows.forEach(function(g){
+      html += '<tr>';
+      html += '<td class="name-cell"><div class="name-primary">'+esc(g.gudang)+'</div></td>';
+      html += '<td class="num">'+fmtNum(g.items)+'</td>';
+      html += '<td class="num">'+fmtNum(g.qty)+'</td>';
+      html += '<td class="num">'+fmtRupiah(g.nilai)+'</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    html += tableFoot2(agg.length, page, pageSize, "gudang", "logistik");
+    html += '</div>';
+
+    html += '<div class="note">Total nilai persediaan gudang pada hasil filter saat ini: <strong class="num">'+fmtRupiah(totalAll)+'</strong></div>';
+    return html;
+  }
+
+  /* ============================= LOGISTIK: GOLONGAN ============================= */
+
+  function renderLogistikGolongan(){
+    if(!state.logistik.loaded) return emptyState("▦","Belum ada data logistik","Import data terlebih dahulu untuk melihat rekap per golongan.","import","logistik");
+    var filtered = applyLogistikFilters(state.logistik.rows);
+    var agg = aggregateByKategori(filtered);
+    var s = state.logistik.sort.golongan;
+    agg = sortRows(agg, s.key, s.dir);
+
+    var html = '<p class="lede">Rekap barang logistik berdasarkan golongan sesuai data sumber (mis. Consumable / Suku Cadang Medis, Consume Product / Bahan Cetakan, dsb).</p>';
+
+    html += '<div class="table-wrap"><table><thead><tr>';
+    html += th2("kategori","Golongan","left",s,"logistik");
+    html += th2("itemCount","Item unik","num",s,"logistik");
+    html += th2("qty","Total qty","num",s,"logistik");
+    html += th2("nilai","Nilai persediaan","num",s,"logistik");
+    html += th2("share","% dari total","num",s,"logistik");
+    html += '</tr></thead><tbody>';
+
+    var page = state.logistik.page.golongan, pageSize = state.logistik.pageSize.golongan;
+    var pageRows = paginate(agg, page, pageSize);
+    if(!pageRows.length){
+      html += '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-secondary)">Tidak ada data untuk filter ini.</td></tr>';
+    }
+    pageRows.forEach(function(k){
+      html += '<tr>';
+      html += '<td class="name-cell"><div class="name-primary">'+esc(k.kategori)+'</div></td>';
+      html += '<td class="num">'+fmtNum(k.itemCount)+'</td>';
+      html += '<td class="num">'+fmtNum(k.qty)+'</td>';
+      html += '<td class="num">'+fmtRupiah(k.nilai)+'</td>';
+      html += '<td class="num">'+fmtPct(k.share)+'</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    html += tableFoot2(agg.length, page, pageSize, "golongan", "logistik");
+    html += '</div>';
+    return html;
+  }
+
+  /* ============================= LOGISTIK: DETAIL ============================= */
+
+  function renderLogistikDetail(){
+    if(!state.logistik.loaded) return emptyState("☰","Belum ada data logistik","Import data terlebih dahulu untuk melihat detail barang.","import","logistik");
+    var filtered = applyLogistikFilters(state.logistik.rows);
+    var agg = aggregateDetail(filtered);
+    var s = state.logistik.sort.detail;
+    agg = sortRows(agg, s.key, s.dir);
+
+    var html = '<p class="lede">Detail nama barang dan total nilai persediaan logistik, dijumlahkan sesuai gudang dan golongan yang sedang difilter.</p>';
+
+    html += '<div class="table-wrap"><table><thead><tr>';
+    html += th2("namaBarang","Nama barang","left",s,"logistik");
+    html += '<th>Golongan</th>';
+    html += th2("gudangCount","Jml gudang","num",s,"logistik");
+    html += th2("qty","Total qty","num",s,"logistik");
+    html += th2("nilai","Total nilai persediaan","num",s,"logistik");
+    html += '</tr></thead><tbody>';
+
+    var page = state.logistik.page.detail, pageSize = state.logistik.pageSize.detail;
+    var pageRows = paginate(agg, page, pageSize);
+    if(!pageRows.length){
+      html += '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-secondary)">Tidak ada data untuk filter ini.</td></tr>';
+    }
+    pageRows.forEach(function(it){
+      html += '<tr>';
+      html += '<td class="name-cell"><div class="name-primary">'+esc(it.namaBarang)+'</div>'+(it.key?'<div class="name-secondary">'+esc(it.key)+'</div>':'')+'</td>';
+      html += '<td>'+esc(it.kategori)+'</td>';
+      html += '<td class="num">'+fmtNum(it.gudangCount)+'</td>';
+      html += '<td class="num">'+fmtNum(it.qty)+'</td>';
+      html += '<td class="num">'+fmtRupiah(it.nilai)+'</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    html += tableFoot2(agg.length, page, pageSize, "detail", "logistik");
+    html += '</div>';
+    return html;
+  }
+
+  /* ============================= SORT/PAGE HELPERS (MODULE-AWARE) ============================= */
+
+  function th2(key, label, align, sortState, module){
+    var isActive = sortState.key===key;
+    var arrow = isActive ? (sortState.dir==="asc" ? "▲" : "▼") : "";
+    var cls = "sortable" + (align==="num" ? " num" : "");
+    return '<th class="'+cls+'" data-action="sort2" data-module="'+module+'" data-key="'+key+'">'+esc(label)+(arrow?' <span class="arrow">'+arrow+'</span>':'')+'</th>';
+  }
+
+  function tableFoot2(total, page, pageSize, scope, module){
+    var totalPages = Math.max(1, Math.ceil(total/pageSize));
+    var html = '<div class="table-foot">';
+    html += '<div>Menampilkan '+fmtNum(Math.min(total,(page-1)*pageSize+1))+'–'+fmtNum(Math.min(total,page*pageSize))+' dari '+fmtNum(total)+' baris</div>';
+    html += '<div class="pager">';
+    html += '<select data-action="pagesize2" data-module="'+module+'" data-scope="'+scope+'">';
+    [25,50,100,200].forEach(function(n){ html += '<option value="'+n+'"'+(pageSize===n?" selected":"")+'>'+n+' / halaman</option>'; });
+    html += '</select>';
+    html += '<button data-action="page-prev2" data-module="'+module+'" data-scope="'+scope+'" '+(page<=1?"disabled":"")+'>‹ Sebelumnya</button>';
+    html += '<span>Hal '+page+' / '+totalPages+'</span>';
+    html += '<button data-action="page-next2" data-module="'+module+'" data-scope="'+scope+'" '+(page>=totalPages?"disabled":"")+'>Berikutnya ›</button>';
+    html += '</div></div>';
+    return html;
+  }
+
+  /* ============================= EVENTS ============================= */
+
+  function bindGlobalEvents(){
+    var app = document.getElementById("app");
+
+    app.onclick = function(e){
+      var t = e.target.closest("[data-action]");
+      if(!t) return;
+      var action = t.dataset.action;
+
+      if(action==="switch-module"){
+        state.currentModule = t.dataset.module;
+        render();
+      } else if(action==="nav"){
+        state.currentModule = t.dataset.module;
+        state.activeTab[t.dataset.module] = t.dataset.tab;
+        render();
+      } else if(action==="pick-farmasi"){
+        document.getElementById("file-farmasi").click();
+      } else if(action==="pick-logistik"){
+        document.getElementById("file-logistik").click();
+      } else if(action==="clear-farmasi"){
+        if(!confirm("Hapus data farmasi dari tampilan ini? (File yang sudah tersimpan di riwayat GitHub tidak ikut terhapus — hapus lewat tab Riwayat bila perlu.)")) return;
+        state.farmasi.loaded=false; state.farmasi.rows=[]; state.farmasi.filename=null; state.farmasi.activeUploadPath=null;
+        state.farmasi.cloudStatus="idle"; state.farmasi.cloudMessage=null;
+        render();
+      } else if(action==="clear-logistik"){
+        if(!confirm("Hapus data logistik dari tampilan ini? (File yang sudah tersimpan di riwayat GitHub tidak ikut terhapus — hapus lewat tab Riwayat bila perlu.)")) return;
+        state.logistik.loaded=false; state.logistik.rows=[]; state.logistik.golonganList=[]; state.logistik.filename=null; state.logistik.activeUploadPath=null;
+        state.logistik.cloudStatus="idle"; state.logistik.cloudMessage=null;
+        render();
+      } else if(action==="save-farmasi"){
+        saveUploadToGithub("farmasi");
+      } else if(action==="save-logistik"){
+        saveUploadToGithub("logistik");
+      } else if(action==="refresh-uploads"){
+        refreshUploadList(t.dataset.module);
+      } else if(action==="select-upload"){
+        viewUpload(t.dataset.module, t.dataset.path);
+      } else if(action==="rename-upload"){
+        renameUploadPrompt(t.dataset.module, t.dataset.path, t.dataset.label);
+      } else if(action==="delete-upload"){
+        deleteUploadConfirm(t.dataset.module, t.dataset.path, t.dataset.label);
+      } else if(action==="open-settings"){
+        openSettings();
+      } else if(action==="close-settings"){
+        if(e.target===t) closeSettings(); // only when the overlay itself (not the box) was clicked
+      } else if(action==="save-settings"){
+        submitGithubSettings(document.getElementById("gh-settings-form"));
+      } else if(action==="clear-settings"){
+        clearGithubSettings();
+      } else if(action==="reset-farmasi-filter"){
+        state.farmasi.filters={gudang:"all",kategori:"all",q:""};
+        state.farmasi.page={gudang:1,kategori:1,detail:1};
+        render();
+      } else if(action==="reset-logistik-filter"){
+        state.logistik.filters={gudang:"all",golongan:"all",q:""};
+        state.logistik.page={gudang:1,golongan:1,detail:1};
+        render();
+      } else if(action==="sort"){
+        var scope = state.activeTab.farmasi;
+        if(state.currentModule==="farmasi" && state.farmasi.sort[scope]){
+          var s = state.farmasi.sort[scope];
+          if(s.key===t.dataset.key) s.dir = s.dir==="asc"?"desc":"asc";
+          else { s.key = t.dataset.key; s.dir="desc"; }
+          render();
+        }
+      } else if(action==="sort2"){
+        var mod2 = t.dataset.module;
+        var scope2 = state.activeTab[mod2];
+        if(state[mod2] && state[mod2].sort && state[mod2].sort[scope2]){
+          var s2 = state[mod2].sort[scope2];
+          if(s2.key===t.dataset.key) s2.dir = s2.dir==="asc"?"desc":"asc";
+          else { s2.key = t.dataset.key; s2.dir="desc"; }
+          render();
+        }
+      } else if(action==="page-prev"){
+        pageStep(t.dataset.scope, -1); render();
+      } else if(action==="page-next"){
+        pageStep(t.dataset.scope, 1); render();
+      } else if(action==="page-prev2"){
+        pageStep2(t.dataset.module, t.dataset.scope, -1); render();
+      } else if(action==="page-next2"){
+        pageStep2(t.dataset.module, t.dataset.scope, 1); render();
+      }
+    };
+
+    app.onchange = function(e){
+      var t = e.target;
+      if(t.dataset && t.dataset.action==="filter-farmasi"){
+        state.farmasi.filters[t.dataset.key] = t.value;
+        state.farmasi.page={gudang:1,kategori:1,detail:1};
+        render();
+      } else if(t.dataset && t.dataset.action==="filter-logistik"){
+        state.logistik.filters[t.dataset.key] = t.value;
+        state.logistik.page={gudang:1,golongan:1,detail:1};
+        render();
+      } else if(t.dataset && t.dataset.action==="override-category"){
+        overrides[t.dataset.key] = t.value;
+        saveOverrides();
+        state.farmasi.rows.forEach(function(r){ if(itemKey(r)===t.dataset.key) r.kategori = t.value; });
+        render();
+        if(state.cloudAvailable) ghSaveOverridesRemote();
+      } else if(t.dataset && t.dataset.action==="pagesize"){
+        var scope = t.dataset.scope;
+        state.farmasi.pageSize[scope] = Number(t.value); state.farmasi.page[scope]=1;
+        render();
+      } else if(t.dataset && t.dataset.action==="pagesize2"){
+        var mod3 = t.dataset.module, sc3 = t.dataset.scope;
+        state[mod3].pageSize[sc3] = Number(t.value);
+        state[mod3].page[sc3] = 1;
+        render();
+      } else if(t.id==="file-farmasi" && t.files && t.files[0]){
+        handleFarmasiFile(t.files[0]);
+      } else if(t.id==="file-logistik" && t.files && t.files[0]){
+        handleLogistikFile(t.files[0]);
+      }
+    };
+
+    var searchDebounced = debounce(function(value, which){
+      if(which==="farmasi"){ state.farmasi.filters.q = value; state.farmasi.page={gudang:1,kategori:1,detail:1}; render(); focusSearch("farmasi"); }
+      else { state.logistik.filters.q = value; state.logistik.page={gudang:1,golongan:1,detail:1}; render(); focusSearch("logistik"); }
+    }, 300);
+
+    app.oninput = function(e){
+      var t = e.target;
+      if(t.dataset && t.dataset.action==="search-farmasi") searchDebounced(t.value, "farmasi");
+      else if(t.dataset && t.dataset.action==="search-logistik") searchDebounced(t.value, "logistik");
+    };
+
+    // drag and drop for dropzones
+    ["dz-farmasi"].forEach(function(id){
+      var el = document.getElementById(id);
+      if(!el) return;
+      el.addEventListener("dragover", function(e){ e.preventDefault(); el.classList.add("drag"); });
+      el.addEventListener("dragleave", function(){ el.classList.remove("drag"); });
+      el.addEventListener("drop", function(e){
+        e.preventDefault(); el.classList.remove("drag");
+        if(e.dataTransfer.files && e.dataTransfer.files[0]) handleFarmasiFile(e.dataTransfer.files[0]);
+      });
+    });
+    var logisticZone = document.querySelector('[data-action="pick-logistik"]');
+    if(logisticZone){
+      logisticZone.addEventListener("dragover", function(e){ e.preventDefault(); logisticZone.classList.add("drag"); });
+      logisticZone.addEventListener("dragleave", function(){ logisticZone.classList.remove("drag"); });
+      logisticZone.addEventListener("drop", function(e){
+        e.preventDefault(); logisticZone.classList.remove("drag");
+        if(e.dataTransfer.files && e.dataTransfer.files[0]) handleLogistikFile(e.dataTransfer.files[0]);
+      });
+    }
+  }
+
+  function focusSearch(which){
+    var sel = which==="farmasi" ? '[data-action="search-farmasi"]' : '[data-action="search-logistik"]';
+    var el = document.querySelector(sel);
+    if(el){ el.focus(); var v=el.value; el.value=""; el.value=v; }
+  }
+
+  function pageStep(scope, dir){
+    state.farmasi.page[scope] = Math.max(1, state.farmasi.page[scope] + dir);
+  }
+
+  function pageStep2(module, scope, dir){
+    state[module].page[scope] = Math.max(1, state[module].page[scope] + dir);
+  }
+
+  /* ============================= INIT ============================= */
+
+  loadGhConfig();
+  loadOverridesLocal();
+  render();
+  initGithub();
+})();
+</script>
+</body>
+</html>
