@@ -178,6 +178,7 @@
   .pill{display:inline-block; padding:3px 9px; border-radius:20px; font-size:11.5px; font-weight:500;}
   .pill-ok{background:var(--success-soft); color:var(--success);}
   .pill-over{background:var(--danger-soft); color:var(--danger);}
+  .pill-warn{background:var(--warning-soft); color:var(--warning);}
   .pill-unset{background:var(--surface-2); color:var(--text-secondary); border:1px solid var(--border);}
   .cat-select{font-family:inherit; font-size:12px; padding:3px 6px; border-radius:6px; border:1px solid var(--border); background:var(--surface); color:var(--text);}
 
@@ -345,7 +346,7 @@
       pageSize:{ gudang:25, kategori:25, detail:25 }
     },
     logistik: {
-      loaded:false, filename:null, rows:[], skipped:0, golonganList:[],
+      loaded:false, filename:null, rows:[], skipped:0, golonganList:[], limits:{ min:1, max:1000, items:{} },
       cloudStatus:"idle", cloudMessage:null, activeUploadPath:null, uploads:[],
       filters:{ gudang:"all", golongan:"all", q:"" },
       sort:{ gudang:{key:"nilai",dir:"desc"}, golongan:{key:"nilai",dir:"desc"}, detail:{key:"nilai",dir:"desc"} },
@@ -353,7 +354,18 @@
       pageSize:{ gudang:25, golongan:25, detail:25 }
     }
   };
-  state.cloudAvailable = undefined; // undefined = checking, true/false once known
+  state.master = { loaded:false, filename:null, rows:[], skipped:0, cloudStatus:"idle", cloudMessage:null, activeUploadPath:null, uploads:[] };
+state.activeTab.umur = "ringkasan";
+state.umur = {
+  loaded:false, filename:null, rows:[], skipped:0, lines:undefined, merge:false,
+  cloudStatus:"idle", cloudMessage:null, activeUploadPath:null, uploads:[],
+  ref:(function(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");})(),
+  def:"2025-12-31",
+  filters:{ sumber:"all", gudang:"all", kategori:"all" },
+  sort:{ gudang:{key:"b4",dir:"desc"}, kategori:{key:"b4",dir:"desc"}, detail:{key:"nilai",dir:"desc"} },
+  page:{ gudang:1, kategori:1, detail:1 }, pageSize:{ gudang:25, kategori:25, detail:25 }
+};
+state.cloudAvailable = undefined; // undefined = checking, true/false once known
   state.cloudConnError = null;
   state.showSettings = false;
 
@@ -373,6 +385,9 @@
 
   var FARMASI_FIELDS  = ["gudang","kodeBarang","idBarang","namaBarang","qty","hargaPokok","persediaan","kategori","status"];
   var LOGISTIK_FIELDS = ["gudang","kodeBarang","idBarang","namaBarang","qty","hargaPokok","persediaan","kategori","produsen","status"];
+var UMUR_FIELDS = ["nama","tgl"];
+var MASTER_FIELDS = ["id","nama","min","max","satuan","akun","status"];
+function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (moduleKey==="umur" ? UMUR_FIELDS : (moduleKey==="master" ? MASTER_FIELDS : LOGISTIK_FIELDS)); }
 
   var ghConfig = { owner:null, repo:null, branch:"main", token:null, historyLimit: CLOUD_HISTORY_LIMIT_DEFAULT };
 
@@ -554,7 +569,8 @@
     st.activeUploadPath = file.path;
     st.cloudStatus = "saved"; st.cloudMessage = null;
     if(moduleKey==="logistik") st.golonganList = Array.from(new Set(rows.map(function(r){return r.kategori;}))).sort();
-    st.page = moduleKey==="farmasi" ? {gudang:1,kategori:1,detail:1} : {gudang:1,golongan:1,detail:1};
+    if(moduleKey==="master") applyMasterToLimits();
+    st.page = moduleKey==="farmasi" ? {gudang:1,kategori:1,detail:1} : (moduleKey==="umur" ? {gudang:1,kategori:1,detail:1} : {gudang:1,golongan:1,detail:1});
   }
 
   function refreshUploadList(moduleKey){
@@ -565,7 +581,7 @@
 
   function saveUploadToGithub(moduleKey){
     if(!ghConfigured()){ openSettings(); return; }
-    var fields = moduleKey==="farmasi" ? FARMASI_FIELDS : LOGISTIK_FIELDS;
+    var fields = fieldsFor(moduleKey);
     state[moduleKey].cloudStatus = "saving"; state[moduleKey].cloudMessage=null; render();
     ghCreateUpload(moduleKey, state[moduleKey].rows, fields, {filename: state[moduleKey].filename, skipped: state[moduleKey].skipped})
       .then(function(res){
@@ -583,7 +599,7 @@
   function viewUpload(moduleKey, path){
     var file = (state[moduleKey].uploads||[]).filter(function(f){ return f.path===path; })[0];
     if(!file) return;
-    var fields = moduleKey==="farmasi" ? FARMASI_FIELDS : LOGISTIK_FIELDS;
+    var fields = fieldsFor(moduleKey);
     state[moduleKey].cloudStatus = "saving"; render();
     ghLoadUpload(file, fields).then(function(res){
       applyLoadedUpload(moduleKey, fields, file, res);
@@ -613,6 +629,7 @@
       if(state[moduleKey].activeUploadPath===path){
         state[moduleKey].loaded=false; state[moduleKey].rows=[]; state[moduleKey].filename=null; state[moduleKey].activeUploadPath=null;
         if(moduleKey==="logistik") state.logistik.golonganList=[];
+        if(moduleKey==="master") applyMasterToLimits();
       }
       refreshUploadList(moduleKey);
     }).catch(function(err){ alert("Gagal menghapus: "+err.message); });
@@ -625,7 +642,7 @@
     ghConfig = { owner:null, repo:null, branch:"main", token:null, historyLimit: CLOUD_HISTORY_LIMIT_DEFAULT };
     try{ localStorage.removeItem(GH_CONFIG_KEY); }catch(e){}
     state.cloudAvailable = false;
-    state.farmasi.uploads = []; state.logistik.uploads = [];
+    state.farmasi.uploads = []; state.logistik.uploads = []; state.umur.uploads = []; state.master.uploads = [];
     state.showSettings = false;
     render();
   }
@@ -664,6 +681,12 @@
     state.logistik.uploads = lists[1];
 
     var loads = [];
+  var uList = await ghListUploads("umur").catch(function(){ return []; });
+  state.umur.uploads = uList;
+  if(uList.length) loads.push(ghLoadUpload(uList[0], UMUR_FIELDS).then(function(res){ applyLoadedUpload("umur", UMUR_FIELDS, uList[0], res); }).catch(function(){}));
+  var mList = await ghListUploads("master").catch(function(){ return []; });
+  state.master.uploads = mList;
+  if(mList.length) loads.push(ghLoadUpload(mList[0], MASTER_FIELDS).then(function(res){ applyLoadedUpload("master", MASTER_FIELDS, mList[0], res); }).catch(function(){}));
     if(lists[0].length) loads.push(ghLoadUpload(lists[0][0], FARMASI_FIELDS).then(function(res){ applyLoadedUpload("farmasi", FARMASI_FIELDS, lists[0][0], res); }).catch(function(){}));
     if(lists[1].length) loads.push(ghLoadUpload(lists[1][0], LOGISTIK_FIELDS).then(function(res){ applyLoadedUpload("logistik", LOGISTIK_FIELDS, lists[1][0], res); }).catch(function(){}));
     await Promise.all(loads);
@@ -1163,7 +1186,7 @@
 
   function renderRingkasanCharts(){
     if(state.currentModule==="farmasi" && state.activeTab.farmasi==="ringkasan" && state.farmasi.loaded){
-      renderFarmasiRingkasanCharts(applyFarmasiFilters(state.farmasi.rows));
+      /* grafik farmasi diganti bar HTML (renderFarmasiTopItems), tanpa Chart.js */
     } else if(state.currentModule==="logistik" && state.activeTab.logistik==="ringkasan" && state.logistik.loaded){
       renderLogistikRingkasanCharts(applyLogistikFilters(state.logistik.rows));
     }
@@ -1197,6 +1220,7 @@
     html += '<div class="module-switch">';
     html += '<button class="module-btn'+(m==="farmasi"?" active":"")+'" data-action="switch-module" data-module="farmasi">Farmasi</button>';
     html += '<button class="module-btn'+(m==="logistik"?" active":"")+'" data-action="switch-module" data-module="logistik">Logistik</button>';
+    html += '<button class="module-btn'+(m==="umur"?" active":"")+'" data-action="switch-module" data-module="umur">Umur</button>';
     html += '</div>';
 
     if(m==="farmasi"){
@@ -1208,7 +1232,7 @@
       html += navItem("farmasi","gudang","▤","Rekap per gudang", fl);
       html += navItem("farmasi","kategori","▦","Rekap per kategori", fl);
       html += navItem("farmasi","detail","☰","Detail barang", fl);
-    } else {
+    } else if(m==="logistik"){
       var ll = state.logistik.loaded;
       html += '<div class="nav-group-label">Modul logistik</div>';
       html += navItem("logistik","ringkasan","◆","Ringkasan", true);
@@ -1217,6 +1241,15 @@
       html += navItem("logistik","gudang","▤","Rekap per gudang", ll);
       html += navItem("logistik","golongan","▦","Rekap per golongan", ll);
       html += navItem("logistik","detail","☰","Detail barang", ll);
+      html += navItem("logistik","batas","⚑","Batas stok (min/maks)", true);
+    } else {
+      html += '<div class="nav-group-label">Umur persediaan</div>';
+      html += navItem("umur","ringkasan","◆","Ringkasan", true);
+      html += navItem("umur","import","⇪","Upload pembelian", true);
+      html += navItem("umur","riwayat","🕓","Riwayat upload", true);
+      html += navItem("umur","gudang","▤","Rekap per gudang", true);
+      html += navItem("umur","kategori","▦","Rekap per kategori", true);
+      html += navItem("umur","detail","☰","Detail barang", true);
     }
 
     html += '<div class="sidebar-foot">Kategori barang dapat disesuaikan manual di tab Detail barang, tersimpan otomatis di perangkat ini.</div>';
@@ -1234,8 +1267,11 @@
     if(m==="farmasi" && state.farmasi.loaded && tab!=="import"){
       html += renderFarmasiFilterbar();
     }
-    if(m==="logistik" && state.logistik.loaded && tab!=="import"){
+    if(m==="logistik" && state.logistik.loaded && tab!=="import" && tab!=="batas" && tab!=="riwayat"){
       html += renderLogistikFilterbar();
+    }
+    if(m==="umur" && (state.farmasi.loaded||state.logistik.loaded) && (tab==="ringkasan"||tab==="gudang"||tab==="kategori"||tab==="detail")){
+      html += renderUmurFilterbar();
     }
     html += '<div class="content">';
     if(m==="farmasi"){
@@ -1245,6 +1281,8 @@
       else if(tab==="gudang") html += renderFarmasiGudang();
       else if(tab==="kategori") html += renderFarmasiKategori();
       else if(tab==="detail") html += renderFarmasiDetail();
+    } else if(m==="umur"){
+      html += renderUmur(tab);
     } else {
       if(tab==="ringkasan") html += renderLogistikRingkasan();
       else if(tab==="import") html += renderLogistikImport();
@@ -1252,6 +1290,7 @@
       else if(tab==="gudang") html += renderLogistikGudang();
       else if(tab==="golongan") html += renderLogistikGolongan();
       else if(tab==="detail") html += renderLogistikDetail();
+      else if(tab==="batas") html += renderMasterPage();
     }
     html += '</div></div>';
     return html;
@@ -1260,16 +1299,20 @@
   function renderTopbar(m, tab){
     var titles = {
       farmasi:{ ringkasan:"Ringkasan farmasi", import:"Import data farmasi", riwayat:"Riwayat upload farmasi", gudang:"Rekap per gudang", kategori:"Rekap per kategori", detail:"Detail barang" },
-      logistik:{ ringkasan:"Ringkasan logistik", import:"Import data logistik", riwayat:"Riwayat upload logistik", gudang:"Rekap per gudang", golongan:"Rekap per golongan", detail:"Detail barang" }
+      umur:{ ringkasan:"Ringkasan umur persediaan", import:"Upload laporan pembelian", riwayat:"Riwayat upload pembelian", gudang:"Umur persediaan per gudang", kategori:"Umur persediaan per kategori", detail:"Detail barang umur persediaan" },
+      logistik:{ ringkasan:"Ringkasan logistik", import:"Import data logistik", riwayat:"Riwayat upload logistik", gudang:"Rekap per gudang", golongan:"Rekap per golongan", detail:"Detail barang", batas:"Batas stok minimum & maksimum" }
     };
     var subs = {
       farmasi: state.farmasi.loaded ? ('File: '+esc(state.farmasi.filename)) : "Belum ada data — mulai dari Import data",
-      logistik: state.logistik.loaded ? ('File: '+esc(state.logistik.filename)) : "Belum ada data — mulai dari Import data"
+      logistik: state.logistik.loaded ? ('File: '+esc(state.logistik.filename)) : "Belum ada data — mulai dari Import data",
+      umur: state.umur.loaded ? ('Pembelian: '+esc(state.umur.filename)) : "Belum ada laporan pembelian — mulai dari Upload pembelian"
     };
     var html = '<div class="topbar">';
     html += '<div><h1>'+esc(titles[m][tab])+'</h1><div class="sub">'+subs[m]+'</div></div>';
     html += '<div class="topbar-right">';
-    if(m==="farmasi"){
+    if(m==="umur"){
+      html += umurBadge();
+    } else if(m==="farmasi"){
       html += state.farmasi.loaded
         ? '<span class="badge badge-ok">'+fmtNum(state.farmasi.rows.length)+' baris dimuat</span>'
         : '<span class="badge badge-off">Belum ada data</span>';
@@ -1318,6 +1361,7 @@
     state.logistik.golonganList.forEach(function(g){ html += '<option value="'+esc(g)+'"'+(f.golongan===g?" selected":"")+'>'+esc(g)+'</option>'; });
     html += '</select></div>';
 
+    if(state.activeTab.logistik==="detail") html += logistikStatusField(f);
     html += '<div class="filter-field"><label>Cari nama barang</label><input type="text" data-action="search-logistik" placeholder="Contoh: kasa" value="'+esc(f.q)+'"></div>';
     html += '<button class="btn btn-reset" data-action="reset-logistik-filter">Reset filter</button>';
     html += '</div>';
@@ -1365,10 +1409,7 @@
     html += '</div>';
     html += '</div>';
 
-    html += '<div class="two-col">';
-    html += '<div class="panel"><h3>Grafik nilai persediaan per gudang</h3><div class="chart-box"><canvas id="chartFarmasiGudang"></canvas></div></div>';
-    html += '<div class="panel"><h3>Grafik distribusi nilai per kategori</h3><div class="chart-box"><canvas id="chartFarmasiKategori"></canvas></div></div>';
-    html += '</div>';
+    html += renderFarmasiTopItems(rows, totalNilai);
 
     if(state.farmasi.skipped>0){
       html += '<div class="warn-box">'+fmtNum(state.farmasi.skipped)+' baris dilewati karena kolom Nama Gudang atau Nama Barang kosong.</div>';
@@ -1605,6 +1646,13 @@
     html += statCard("Item unik", fmtNum(uniqueItems), "nama/kode barang berbeda");
     html += statCard("Jumlah golongan", fmtNum(golonganAgg.length), "golongan barang");
     html += '</div>';
+    var stc = logistikStatusStats(rows), lm = state.logistik.limits;
+    html += '<div class="stat-row">';
+    html += statCard("Item di bawah stok minimum", fmtNum(stc[0]), "qty kurang dari min (default "+fmtNum(lm.min)+")");
+    html += statCard("Item melebihi stok maksimum", fmtNum(stc[2]), "qty lebih dari maks (default "+fmtNum(lm.max)+")");
+    html += statCard("Item stok normal", fmtNum(stc[1]), "di antara minimum dan maksimum");
+    html += '</div>';
+    html += '<div class="note" style="margin-top:-8px;margin-bottom:18px"><span class="link-action" data-action="logistik-status" data-status="0">Lihat item di bawah minimum</span> · <span class="link-action" data-action="logistik-status" data-status="2">Lihat item melebihi maksimum</span></div>';
 
     var topGudang = sortRows(gudangAgg, "nilai", "desc").slice(0,6);
     var maxGudangNilai = topGudang.length ? topGudang[0].nilai : 1;
@@ -1751,40 +1799,238 @@
 
   /* ============================= LOGISTIK: DETAIL ============================= */
 
+  /* ============================= LOGISTIK: STOK MIN / MAKS (dari master barang) ============================= */
+
+  var ST_LABEL = ["Di bawah minimum","Normal","Melebihi maksimum"];
+  var ST_CLS = ["pill-over","pill-ok","pill-warn"];
+
+  // Batas default (min 1, maks 1000). Batas per barang dari file master (STOCKMIN/STOCKMAX > 0) menggantikan default.
+  function logistikLimit(it){
+    var L = state.logistik.limits;
+    var o = L.items[it.key] || L.items["n:"+String(it.namaBarang).trim().toLowerCase()];
+    return {
+      min: (o && o.min!=null) ? o.min : L.min,
+      max: (o && o.max!=null) ? o.max : L.max,
+      satuan: o ? o.satuan : null,
+      custom: !!(o && (o.min!=null || o.max!=null))
+    };
+  }
+  // Qty tiap barang di SEMUA gudang (batas master berlaku per barang, bukan per gudang)
+  function logistikQtyAll(){
+    var st = state.logistik, c = st._qa;
+    if(!c || c.ref!==st.rows){
+      var m = {};
+      st.rows.forEach(function(r){ var k = itemKey(r)+"||"+r.namaBarang; m[k] = (m[k]||0) + r.qty; });
+      c = st._qa = {ref:st.rows, map:m};
+    }
+    return c.map;
+  }
+  function logistikDetailRows(rows){
+    var qa = logistikQtyAll();
+    return aggregateDetail(rows).map(function(it){
+      var lim = logistikLimit(it);
+      it.minStok = lim.min; it.maxStok = lim.max; it.satuan = lim.satuan; it.custom = lim.custom;
+      it.qtyAll = qa[it.key+"||"+it.namaBarang]; if(it.qtyAll===undefined) it.qtyAll = it.qty;
+      it.stNum = it.qtyAll < lim.min ? 0 : (it.qtyAll > lim.max ? 2 : 1);
+      return it;
+    });
+  }
+  function logistikStatusField(f){
+    var opts = [["all","Semua status"],["0","Di bawah minimum"],["1","Normal"],["2","Melebihi maksimum"]];
+    var cur = f.status || "all";
+    var h = '<div class="filter-field"><label>Status stok</label><select data-action="filter-logistik" data-key="status">';
+    opts.forEach(function(o){ h += '<option value="'+o[0]+'"'+(cur===o[0]?" selected":"")+'>'+o[1]+'</option>'; });
+    return h + '</select></div>';
+  }
+  function logistikStatusStats(rows){
+    var c = [0,0,0];
+    logistikDetailRows(rows).forEach(function(it){ c[it.stNum]++; });
+    return c;
+  }
+
   function renderLogistikDetail(){
     if(!state.logistik.loaded) return emptyState("☰","Belum ada data logistik","Import data terlebih dahulu untuk melihat detail barang.","import","logistik");
     var filtered = applyLogistikFilters(state.logistik.rows);
-    var agg = aggregateDetail(filtered);
+    var agg = logistikDetailRows(filtered);
+    var st = state.logistik.filters.status;
+    if(st && st!=="all") agg = agg.filter(function(it){ return String(it.stNum)===st; });
     var s = state.logistik.sort.detail;
     agg = sortRows(agg, s.key, s.dir);
+    var L = state.logistik.limits, gsel = state.logistik.filters.gudang!=="all";
 
-    var html = '<p class="lede">Detail nama barang dan total nilai persediaan logistik, dijumlahkan sesuai gudang dan golongan yang sedang difilter.</p>';
+    var html = '<p class="lede">Detail nama barang, total nilai persediaan, dan status stok terhadap batas minimum dan maksimum. Status dihitung dari qty barang di <b>semua gudang</b> (batas berlaku per barang). '+
+      (state.master.loaded ? 'Batas per barang diambil dari file master; barang yang belum diatur memakai default (min '+fmtNum(L.min)+', maks '+fmtNum(L.max)+').'
+                           : 'Batas sementara memakai default untuk semua barang: min '+fmtNum(L.min)+', maks '+fmtNum(L.max)+'. Upload file master di menu Batas stok untuk batas per barang.')+'</p>';
 
     html += '<div class="table-wrap"><table><thead><tr>';
     html += th2("namaBarang","Nama barang","left",s,"logistik");
     html += '<th>Golongan</th>';
     html += th2("gudangCount","Jml gudang","num",s,"logistik");
     html += th2("qty","Total qty","num",s,"logistik");
+    html += th2("minStok","Stok min","num",s,"logistik");
+    html += th2("maxStok","Stok maks","num",s,"logistik");
+    html += th2("stNum","Status","left",s,"logistik");
     html += th2("nilai","Total nilai persediaan","num",s,"logistik");
     html += '</tr></thead><tbody>';
 
     var page = state.logistik.page.detail, pageSize = state.logistik.pageSize.detail;
     var pageRows = paginate(agg, page, pageSize);
     if(!pageRows.length){
-      html += '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-secondary)">Tidak ada data untuk filter ini.</td></tr>';
+      html += '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-secondary)">Tidak ada data untuk filter ini.</td></tr>';
     }
     pageRows.forEach(function(it){
       html += '<tr>';
       html += '<td class="name-cell"><div class="name-primary">'+esc(it.namaBarang)+'</div>'+(it.key?'<div class="name-secondary">'+esc(it.key)+'</div>':'')+'</td>';
       html += '<td>'+esc(it.kategori)+'</td>';
       html += '<td class="num">'+fmtNum(it.gudangCount)+'</td>';
-      html += '<td class="num">'+fmtNum(it.qty)+'</td>';
+      html += '<td class="num">'+fmtNum(it.qty)+(it.satuan?' <span style="color:var(--text-secondary)">'+esc(it.satuan)+'</span>':'')+(gsel&&it.qtyAll!==it.qty?'<div class="name-secondary">semua gudang: '+fmtNum(it.qtyAll)+'</div>':'')+'</td>';
+      html += '<td class="num">'+fmtNum(it.minStok)+'</td>';
+      html += '<td class="num">'+fmtNum(it.maxStok)+'</td>';
+      html += '<td><span class="pill '+ST_CLS[it.stNum]+'">'+ST_LABEL[it.stNum]+'</span></td>';
       html += '<td class="num">'+fmtRupiah(it.nilai)+'</td>';
       html += '</tr>';
     });
     html += '</tbody></table>';
     html += tableFoot2(agg.length, page, pageSize, "detail", "logistik");
     html += '</div>';
+    return html;
+  }
+
+  /* ============================= LOGISTIK: BATAS STOK (UPLOAD MASTER BARANG) ============================= */
+
+  function parseMasterWorkbook(wb){
+    var raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {defval:null});
+    if(!raw.length) return null;
+    var H = {};
+    Object.keys(raw[0]).forEach(function(h){ H[normalizeHeader(h)] = h; });
+    var hid=H.idbarang, hn=H.namabarang, hmin=H.stockmin, hmax=H.stockmax;
+    if(!hn || (!hmin && !hmax)) return null;
+    var hs=H.namasatuanjual||H.namasatuanbeli, ha=H.namacoapersediaan, hst=H.status, rows=[], skipped=0;
+    raw.forEach(function(r){
+      var nm=r[hn];
+      if(!nm){ skipped++; return; }
+      rows.push({
+        id: (hid && r[hid]!==null && r[hid]!=="") ? String(r[hid]) : null,
+        nama: String(nm).trim(),
+        min: (hmin && Number(r[hmin])) || 0,
+        max: (hmax && Number(r[hmax])) || 0,
+        satuan: (hs && r[hs]) ? String(r[hs]).trim() : null,
+        akun: (ha && r[ha]) ? String(r[ha]).trim() : null,
+        status: (hst && r[hst]) ? String(r[hst]) : null
+      });
+    });
+    return {rows:rows, skipped:skipped};
+  }
+  function applyMasterToLimits(){
+    var items = {};
+    if(state.master.loaded) state.master.rows.forEach(function(r){
+      var o = { min: r.min>0 ? r.min : null, max: r.max>0 ? r.max : null, satuan: r.satuan, akun: r.akun };
+      if(r.id!==null && r.id!==undefined) items["ID"+r.id] = o;
+      items["n:"+String(r.nama).trim().toLowerCase()] = o;
+    });
+    state.logistik.limits.items = items;
+  }
+  function handleMasterFile(file){
+    var reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        var res = parseMasterWorkbook(XLSX.read(new Uint8Array(e.target.result), {type:"array"}));
+        if(!res || !res.rows.length){ alert("File tidak dikenali. Pastikan file master barang punya kolom NAMA_BARANG serta STOCKMIN dan/atau STOCKMAX."); return; }
+        var M = state.master;
+        M.rows = res.rows; M.loaded = true; M.filename = file.name; M.skipped = res.skipped;
+        M.activeUploadPath = null; M.cloudStatus = "idle"; M.cloudMessage = null;
+        applyMasterToLimits();
+        render();
+      }catch(err){ alert("Gagal membaca file: "+err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+  function renderMasterPage(){
+    var M = state.master, L = state.logistik.limits;
+    var html = '<div class="import-shell">'+cloudBanner("master");
+    html += '<p class="lede">Upload file master barang logistik (.xlsx) untuk memakai batas stok minimum dan maksimum per barang. Kolom yang dibaca: ID_BARANG, NAMA_BARANG, STOCKMIN, STOCKMAX, NAMA_SATUANJUAL, NAMA_COA_PERSEDIAAN, STATUS. Nilai 0 dianggap belum diatur dan memakai batas default (min '+fmtNum(L.min)+', maks '+fmtNum(L.max)+').</p>';
+    html += '<div class="dropzone" id="dz-master" data-action="pick-master"><div class="ic">⇪</div><div class="title">Tarik file ke sini atau klik untuk memilih</div><div class="hint">Mendukung .xlsx, .xls, dan .csv</div></div>';
+    html += '<input type="file" id="file-master" accept=".xlsx,.xls,.csv">';
+    if(M.loaded){
+      var nMin=0, nMax=0, ids={}, matched=0;
+      M.rows.forEach(function(r){ if(r.min>0) nMin++; if(r.max>0) nMax++; if(r.id!==null) ids["ID"+r.id]=1; });
+      if(state.logistik.loaded){ var seen={}; state.logistik.rows.forEach(function(r){ var k=itemKey(r); if(!seen[k]){ seen[k]=1; if(ids[k]) matched++; } }); }
+      html += '<div class="import-summary">';
+      html += '<div class="row"><span>File aktif</span><span class="v">'+esc(M.filename)+'</span></div>';
+      html += '<div class="row"><span>Jumlah barang di master</span><span class="v">'+fmtNum(M.rows.length)+'</span></div>';
+      html += '<div class="row"><span>Barang dengan stok minimum diatur</span><span class="v">'+fmtNum(nMin)+'</span></div>';
+      html += '<div class="row"><span>Barang dengan stok maksimum diatur</span><span class="v">'+fmtNum(nMax)+'</span></div>';
+      if(state.logistik.loaded) html += '<div class="row"><span>Barang di data stok yang cocok dengan master (lewat ID Barang)</span><span class="v">'+fmtNum(matched)+'</span></div>';
+      html += '</div>';
+      html += '<div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">';
+      html += '<button class="btn btn-save" data-action="save-master" '+(M.cloudStatus==="saving"?"disabled":"")+'>💾 '+(M.cloudStatus==="saving"?"Menyimpan…":"Simpan ke GitHub")+'</button>';
+      html += '<button class="btn" data-action="clear-master">Hapus dari tampilan ini</button></div>';
+      if(!ghConfigured()) html += '<div class="note">Atur GitHub dulu (tombol ⚙️ di kanan atas) supaya tombol simpan ini aktif.</div>';
+    }
+    html += '<div class="note">Barang dicocokkan ke data stok lewat ID Barang (cadangan: nama barang). Batas dibandingkan dengan total qty barang di semua gudang. Hasilnya tampil di Detail barang dan Ringkasan logistik.</div>';
+    html += '</div>';
+    return html + renderUploadHistory("master");
+  }
+
+  /* ============================= FARMASI: GRAFIK DETAIL NILAI PER BARANG ============================= */
+
+  function renderFarmasiTopItems(rows, total){
+    var n = state.farmasi.topN || 15;
+    var top = sortRows(aggregateDetail(rows), "nilai", "desc").slice(0, n);
+    var mx = top.length ? Math.max(top[0].nilai, 1) : 1, sum = 0;
+    top.forEach(function(it){ sum += it.nilai; });
+    var h = '<div class="panel"><div class="table-toolbar"><h3 style="margin:0">Detail nilai persediaan per barang</h3><select data-action="farmasi-topn">';
+    [10,15,25,50].forEach(function(x){ h += '<option value="'+x+'"'+(n===x?" selected":"")+'>'+x+' barang teratas</option>'; });
+    h += '</select></div>';
+    top.forEach(function(it){
+      h += barRow(it.namaBarang, it.nilai, mx, fmtRupiah(it.nilai)+" · "+fmtPct(total>0 ? it.nilai/total*100 : 0));
+    });
+    h += '<div class="note">'+fmtNum(top.length)+' barang teratas = '+fmtRupiah(sum)+' ('+fmtPct(total>0 ? sum/total*100 : 0)+' dari total nilai pada filter ini). Daftar lengkap ada di tab Detail barang.</div></div>';
+    return h;
+  }
+
+  /* ============================= UMUR: DETAIL BARANG ============================= */
+
+  function umurDetailRows(){
+    var u=state.umur, f=u.filters, map=umurMap(), refD=isoDay(u.ref), defD=isoDay(u.def);
+    var q=(f.q||"").toLowerCase(), bf=(f.bucket&&f.bucket!=="all")?+f.bucket:-1, M={};
+    umurStock().forEach(function(r){
+      if(f.sumber!=="all" && r.s!==f.sumber) return;
+      if(f.gudang!=="all" && r.g!==f.gudang) return;
+      if(f.kategori!=="all" && r.k!==f.kategori) return;
+      var nm=String(r.n), low=nm.trim().toLowerCase();
+      if(q && nm.toLowerCase().indexOf(q)===-1) return;
+      var key=r.s+"||"+low, o=M[key];
+      if(!o) o=M[key]={name:nm,sumber:r.s,kategori:r.k,qty:0,nilai:0,gset:{},gudangCount:0,lt:map[low]};
+      o.qty+=r.q||0; o.nilai+=r.v||0;
+      if(!o.gset[r.g]){ o.gset[r.g]=1; o.gudangCount++; }
+    });
+    var out=[];
+    Object.keys(M).forEach(function(k){
+      var o=M[k], has=o.lt!==undefined, days=refD-(has?o.lt:defD);
+      o.has=has; o.days=days; o.b=days<31?0:days<61?1:days<91?2:days<121?3:4;
+      if(bf>=0 && o.b!==bf) return;
+      out.push(o);
+    });
+    return out;
+  }
+
+  function renderUmurDetail(){
+    var u=state.umur, rows=umurDetailRows(), s=u.sort.detail;
+    rows=sortRows(rows,s.key,s.dir);
+    var tn=0,to=0; rows.forEach(function(r){ tn+=r.nilai; if(r.b===4) to+=r.nilai; });
+    var html=umurWarn();
+    html+='<p class="lede">Detail barang beserta tanggal pembelian terakhir dan umur persediaannya (acuan '+esc(u.ref)+'). Qty dan nilai dijumlahkan sesuai filter gudang, kategori, dan sumber yang aktif.</p>';
+    html+='<div class="table-wrap"><table><thead><tr>'+th2("name","Nama barang","left",s,"umur")+'<th>Kategori</th>'+th2("gudangCount","Jml gudang","num",s,"umur")+th2("qty","Total qty","num",s,"umur")+th2("nilai","Nilai persediaan","num",s,"umur")+th2("lt","Pembelian terakhir","left",s,"umur")+th2("days","Umur (hari)","num",s,"umur")+th2("b","Kelompok umur","left",s,"umur")+'</tr></thead><tbody>';
+    var page=u.page.detail, size=u.pageSize.detail, pr=paginate(rows,page,size);
+    if(!pr.length) html+='<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-secondary)">Tidak ada data untuk filter ini.</td></tr>';
+    pr.forEach(function(r){
+      var cls=r.b===4?"pill-over":(r.b>=2?"pill-warn":"pill-ok");
+      html+='<tr><td class="name-cell"><div class="name-primary">'+esc(r.name)+'</div><div class="name-secondary">'+esc(r.sumber)+'</div></td><td>'+esc(r.kategori)+'</td><td class="num">'+fmtNum(r.gudangCount)+'</td><td class="num">'+fmtNum(r.qty)+'</td><td class="num">'+fmtRupiah(r.nilai)+'</td>'+
+        '<td>'+(r.has?esc(dayToIso(r.lt)):'<span style="color:var(--text-secondary)">Tidak ada riwayat</span>')+'</td><td class="num">'+fmtNum(r.days)+'</td><td><span class="pill '+cls+'">'+BK[r.b]+' hari</span></td></tr>';
+    });
+    html+='</tbody></table>'+tableFoot2(rows.length,page,size,"detail","umur")+'</div>';
+    html+='<div class="note">'+fmtNum(rows.length)+' barang · total nilai <strong class="num">'+fmtRupiah(tn)+'</strong> · umur &gt;120 hari <strong class="num">'+fmtRupiah(to)+'</strong></div>';
     return html;
   }
 
@@ -1833,6 +2079,20 @@
         document.getElementById("file-farmasi").click();
       } else if(action==="pick-logistik"){
         document.getElementById("file-logistik").click();
+      } else if(action==="pick-master"){
+        document.getElementById("file-master").click();
+      } else if(action==="save-master"){
+        saveUploadToGithub("master");
+      } else if(action==="clear-master"){
+        if(!confirm("Hapus data master dari tampilan ini? Batas kembali ke default. (File di riwayat GitHub tidak ikut terhapus.)")) return;
+        state.master.loaded=false; state.master.rows=[]; state.master.filename=null; state.master.activeUploadPath=null;
+        state.master.cloudStatus="idle"; state.master.cloudMessage=null; applyMasterToLimits(); render();
+      } else if(action==="logistik-status"){
+        state.currentModule="logistik"; state.activeTab.logistik="detail";
+        state.logistik.filters.status=t.dataset.status; state.logistik.page.detail=1;
+        render();
+      } else if(action==="pick-umur"){
+        document.getElementById("file-umur").click();
       } else if(action==="clear-farmasi"){
         if(!confirm("Hapus data farmasi dari tampilan ini? (File yang sudah tersimpan di riwayat GitHub tidak ikut terhapus — hapus lewat tab Riwayat bila perlu.)")) return;
         state.farmasi.loaded=false; state.farmasi.rows=[]; state.farmasi.filename=null; state.farmasi.activeUploadPath=null;
@@ -1847,6 +2107,16 @@
         saveUploadToGithub("farmasi");
       } else if(action==="save-logistik"){
         saveUploadToGithub("logistik");
+      } else if(action==="save-umur"){
+        saveUploadToGithub("umur");
+      } else if(action==="clear-umur"){
+        if(!confirm("Hapus data pembelian dari tampilan ini? (File yang sudah tersimpan di riwayat GitHub tidak ikut terhapus.)")) return;
+        state.umur.loaded=false; state.umur.rows=[]; state.umur.filename=null; state.umur.activeUploadPath=null;
+        state.umur.cloudStatus="idle"; state.umur.cloudMessage=null;
+        render();
+      } else if(action==="reset-umur-filter"){
+        state.umur.filters={sumber:"all",gudang:"all",kategori:"all"}; state.umur.page={gudang:1,kategori:1,detail:1};
+        render();
       } else if(action==="refresh-uploads"){
         refreshUploadList(t.dataset.module);
       } else if(action==="select-upload"){
@@ -1924,6 +2194,20 @@
         state[mod3].pageSize[sc3] = Number(t.value);
         state[mod3].page[sc3] = 1;
         render();
+      } else if(t.dataset && t.dataset.action==="filter-umur"){
+        state.umur.filters[t.dataset.key] = t.value; state.umur.page={gudang:1,kategori:1,detail:1};
+        render();
+      } else if(t.dataset && t.dataset.action==="umur-date"){
+        if(t.value) state.umur[t.dataset.key] = t.value;
+        render();
+      } else if(t.dataset && t.dataset.action==="farmasi-topn"){
+        state.farmasi.topN = +t.value || 15; render();
+      } else if(t.id==="file-master" && t.files && t.files[0]){
+        handleMasterFile(t.files[0]);
+      } else if(t.dataset && t.dataset.action==="umur-merge"){
+        state.umur.merge = t.checked;
+      } else if(t.id==="file-umur" && t.files && t.files.length){
+        handleUmurFiles(t.files);
       } else if(t.id==="file-farmasi" && t.files && t.files[0]){
         handleFarmasiFile(t.files[0]);
       } else if(t.id==="file-logistik" && t.files && t.files[0]){
@@ -1936,10 +2220,17 @@
       else { state.logistik.filters.q = value; state.logistik.page={gudang:1,golongan:1,detail:1}; render(); focusSearch("logistik"); }
     }, 300);
 
+    var searchUmurDebounced = debounce(function(value){
+      state.umur.filters.q = value; state.umur.page.detail = 1; render();
+      var el = document.querySelector('[data-action="search-umur"]');
+      if(el){ el.focus(); var v=el.value; el.value=""; el.value=v; }
+    }, 300);
+
     app.oninput = function(e){
       var t = e.target;
       if(t.dataset && t.dataset.action==="search-farmasi") searchDebounced(t.value, "farmasi");
       else if(t.dataset && t.dataset.action==="search-logistik") searchDebounced(t.value, "logistik");
+      else if(t.dataset && t.dataset.action==="search-umur") searchUmurDebounced(t.value);
     };
 
     // drag and drop for dropzones
@@ -1953,6 +2244,24 @@
         if(e.dataTransfer.files && e.dataTransfer.files[0]) handleFarmasiFile(e.dataTransfer.files[0]);
       });
     });
+    var masterZone = document.getElementById("dz-master");
+    if(masterZone){
+      masterZone.addEventListener("dragover", function(e){ e.preventDefault(); masterZone.classList.add("drag"); });
+      masterZone.addEventListener("dragleave", function(){ masterZone.classList.remove("drag"); });
+      masterZone.addEventListener("drop", function(e){
+        e.preventDefault(); masterZone.classList.remove("drag");
+        if(e.dataTransfer.files && e.dataTransfer.files[0]) handleMasterFile(e.dataTransfer.files[0]);
+      });
+    }
+    var umurZone = document.getElementById("dz-umur");
+    if(umurZone){
+      umurZone.addEventListener("dragover", function(e){ e.preventDefault(); umurZone.classList.add("drag"); });
+      umurZone.addEventListener("dragleave", function(){ umurZone.classList.remove("drag"); });
+      umurZone.addEventListener("drop", function(e){
+        e.preventDefault(); umurZone.classList.remove("drag");
+        if(e.dataTransfer.files && e.dataTransfer.files.length) handleUmurFiles(e.dataTransfer.files);
+      });
+    }
     var logisticZone = document.querySelector('[data-action="pick-logistik"]');
     if(logisticZone){
       logisticZone.addEventListener("dragover", function(e){ e.preventDefault(); logisticZone.classList.add("drag"); });
@@ -1976,6 +2285,218 @@
 
   function pageStep2(module, scope, dir){
     state[module].page[scope] = Math.max(1, state[module].page[scope] + dir);
+  }
+
+  /* ============================= UMUR PERSEDIAAN ============================= */
+
+  var BK = ["<30","31-60","61-90","91-120",">120"];
+
+  function isoDay(s){ var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s||""); return m ? Math.floor(Date.UTC(+m[1],+m[2]-1,+m[3])/864e5) : null; }
+  function dayToIso(d){ return new Date(d*864e5).toISOString().slice(0,10); }
+  function toDay(v){
+    if(v===null||v===undefined||v==="") return null;
+    if(typeof v==="number") return isFinite(v) ? Math.floor(v)-25569 : null;
+    if(v instanceof Date) return Math.floor(Date.UTC(v.getFullYear(),v.getMonth(),v.getDate())/864e5);
+    var s=String(v).trim(), m=/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/.exec(s);
+    if(m) return Math.floor(Date.UTC(+m[3],+m[2]-1,+m[1])/864e5);
+    m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+    return m ? Math.floor(Date.UTC(+m[1],+m[2]-1,+m[3])/864e5) : null;
+  }
+
+  // Laporan pembelian: kolom "Nama Barang" + "Tanggal Pembelian" (farmasi/logistik) atau "Tanggal" (apotek).
+  function parsePurchaseWorkbook(wb, into){
+    var raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {defval:null});
+    if(!raw.length) return false;
+    var nameH=null, dateH=null, dateH2=null;
+    Object.keys(raw[0]).forEach(function(h){
+      var n=normalizeHeader(h);
+      if(n==="namabarang") nameH=h; else if(n==="tanggalpembelian") dateH=h; else if(n==="tanggal") dateH2=h;
+    });
+    dateH = dateH || dateH2;
+    if(!nameH || !dateH) return false;
+    raw.forEach(function(r){
+      var n=r[nameH], d=toDay(r[dateH]);
+      if(!n || d===null){ into.skipped++; return; }
+      var k=String(n).trim().toLowerCase();
+      into.lines++;
+      if(!(into.map[k]>=d)) into.map[k]=d;
+    });
+    return true;
+  }
+
+  function handleUmurFiles(fileList){
+    var files=Array.prototype.slice.call(fileList), u=state.umur;
+    var into={map:Object.create(null), lines:0, skipped:0}, names=[], bad=[];
+    if(u.merge && u.loaded) u.rows.forEach(function(r){ into.map[r.nama]=r.tgl; });
+    var chain=Promise.resolve();
+    files.forEach(function(f){
+      chain=chain.then(function(){ return new Promise(function(res){
+        var rd=new FileReader();
+        rd.onload=function(e){
+          try{ var wb=XLSX.read(new Uint8Array(e.target.result),{type:"array"}); if(parsePurchaseWorkbook(wb,into)) names.push(f.name); else bad.push(f.name); }
+          catch(err){ bad.push(f.name); }
+          res();
+        };
+        rd.onerror=function(){ bad.push(f.name); res(); };
+        rd.readAsArrayBuffer(f);
+      }); });
+    });
+    return chain.then(function(){
+      if(!names.length){ alert("Tidak ada laporan pembelian yang dikenali. Pastikan file punya kolom Nama Barang dan Tanggal Pembelian (atau Tanggal)."+(bad.length?"\n\nTidak terbaca: "+bad.join(", "):"")); return; }
+      u.rows=Object.keys(into.map).map(function(k){ return {nama:k, tgl:into.map[k]}; });
+      u.loaded=true; u.filename=names.join(", "); u.skipped=into.skipped; u.lines=into.lines;
+      u.activeUploadPath=null; u.cloudStatus="idle"; u.cloudMessage=null; u.page={gudang:1,kategori:1,detail:1};
+      if(bad.length) alert("File berikut dilewati karena kolom tidak dikenali: "+bad.join(", "));
+      render();
+    });
+  }
+
+  function umurMap(){
+    var u=state.umur;
+    if(u._ref!==u.rows){ var m=Object.create(null); u.rows.forEach(function(r){ m[r.nama]=r.tgl; }); u._map=m; u._ref=u.rows; }
+    return u._map;
+  }
+
+  function umurStock(){
+    var out=[];
+    state.farmasi.rows.forEach(function(r){ out.push({g:r.gudang,n:r.namaBarang,v:r.persediaan,q:r.qty,k:r.kategori,s:"Farmasi"}); });
+    state.logistik.rows.forEach(function(r){ out.push({g:r.gudang,n:r.namaBarang,v:r.persediaan,q:r.qty,k:/suku cadang medis/i.test(r.kategori||"")?"Alkes":"Lain-lain",s:"Logistik"}); });
+    return out;
+  }
+
+  function umurCompute(){
+    var u=state.umur, f=u.filters, map=umurMap(), refD=isoDay(u.ref), defD=isoDay(u.def);
+    var G={}, K={}, T={v:0,hit:0,n:0,b:[0,0,0,0,0]};
+    umurStock().forEach(function(r){
+      if(f.sumber!=="all" && r.s!==f.sumber) return;
+      if(f.gudang!=="all" && r.g!==f.gudang) return;
+      if(f.kategori!=="all" && r.k!==f.kategori) return;
+      var lt=map[String(r.n).trim().toLowerCase()];
+      var days=refD-(lt!==undefined?lt:defD);
+      var b=days<31?0:days<61?1:days<91?2:days<121?3:4, v=r.v||0;
+      T.n++; T.v+=v; T.b[b]+=v; if(lt!==undefined) T.hit+=v;
+      [[G,r.g],[K,r.k]].forEach(function(p){
+        var o=p[0][p[1]];
+        if(!o) o=p[0][p[1]]={name:p[1],total:0,items:0,b0:0,b1:0,b2:0,b3:0,b4:0};
+        o.total+=v; o.items++; o["b"+b]+=v;
+      });
+    });
+    return {G:Object.keys(G).map(function(k){return G[k];}), K:Object.keys(K).map(function(k){return K[k];}), T:T};
+  }
+
+  function umurGate(){
+    if(!state.farmasi.loaded && !state.logistik.loaded)
+      return emptyState("⏳","Belum ada data stok","Modul ini memakai data stok farmasi dan logistik yang sudah dimuat. Muat data stok dulu.","import","farmasi");
+    return "";
+  }
+
+  function umurWarn(){
+    if(state.umur.loaded) return "";
+    return '<div class="warn-box">Belum ada laporan pembelian dimuat, jadi semua barang dianggap dibeli pada tanggal default ('+esc(state.umur.def)+') dan masuk kolom &gt;120. <span class="link-action" data-action="nav" data-module="umur" data-tab="import">Upload pembelian</span></div>';
+  }
+
+  function umurBadge(){
+    return state.umur.loaded
+      ? '<span class="badge badge-ok">'+fmtNum(state.umur.rows.length)+' barang punya riwayat pembelian</span>'
+      : '<span class="badge badge-warn">Belum ada laporan pembelian</span>';
+  }
+
+  function renderUmurFilterbar(){
+    var f=state.umur.filters, u=state.umur;
+    var gl={}; umurStock().forEach(function(r){ gl[r.g]=1; });
+    var gudangList=Object.keys(gl).sort();
+    function sel(key, label, all, opts){
+      var h='<div class="filter-field"><label>'+label+'</label><select data-action="filter-umur" data-key="'+key+'">';
+      h+='<option value="all"'+(f[key]==="all"?" selected":"")+'>'+all+'</option>';
+      opts.forEach(function(o){ h+='<option value="'+esc(o)+'"'+(f[key]===o?" selected":"")+'>'+esc(o)+'</option>'; });
+      return h+'</select></div>';
+    }
+    var html='<div class="filterbar">';
+    html+=sel("sumber","Sumber","Farmasi + Logistik",["Farmasi","Logistik"]);
+    html+=sel("gudang","Gudang","Semua gudang",gudangList);
+    html+=sel("kategori","Kategori","Semua kategori",CATEGORIES);
+    if(state.activeTab.umur==="detail"){
+      html+='<div class="filter-field"><label>Kelompok umur</label><select data-action="filter-umur" data-key="bucket"><option value="all"'+((!f.bucket||f.bucket==="all")?" selected":"")+'>Semua umur</option>'+BK.map(function(b,i){ return '<option value="'+i+'"'+(f.bucket===String(i)?" selected":"")+'>'+b+' hari</option>'; }).join("")+'</select></div>';
+      html+='<div class="filter-field"><label>Cari nama barang</label><input type="text" data-action="search-umur" placeholder="Contoh: kasa" value="'+esc(f.q||"")+'"></div>';
+    }
+    html+='<div class="filter-field"><label>Tanggal acuan (hari ini)</label><input type="date" data-action="umur-date" data-key="ref" value="'+esc(u.ref)+'"></div>';
+    html+='<div class="filter-field"><label>Tanggal bila tanpa pembelian</label><input type="date" data-action="umur-date" data-key="def" value="'+esc(u.def)+'"></div>';
+    html+='<button class="btn btn-reset" data-action="reset-umur-filter">Reset filter</button></div>';
+    return html;
+  }
+
+  function renderUmur(tab){
+    if(tab==="import") return renderUmurImport();
+    if(tab==="riwayat") return renderUploadHistory("umur");
+    var g=umurGate(); if(g) return g;
+    if(tab==="ringkasan") return renderUmurRingkasan();
+    if(tab==="detail") return renderUmurDetail();
+    return renderUmurTable(tab);
+  }
+
+  function renderUmurRingkasan(){
+    var c=umurCompute(), T=c.T, old=T.b[4];
+    var html=umurWarn();
+    html+='<div class="stat-row">';
+    html+=statCard("Total persediaan",fmtRupiah(T.v),fmtNum(T.n)+" baris stok",true);
+    html+=statCard("Umur >120 hari",fmtRupiah(old),T.v?fmtPct(old/T.v*100)+" dari total":"-");
+    html+=statCard("Jumlah gudang",fmtNum(c.G.length),"dengan stok pada filter ini");
+    html+=statCard("Punya riwayat pembelian",T.v?fmtPct(T.hit/T.v*100):"-","dari nilai persediaan");
+    html+='</div><div class="two-col"><div class="panel"><h3>Sebaran umur persediaan</h3>';
+    var mx=Math.max.apply(null,T.b.concat([1]));
+    BK.forEach(function(b,i){ html+=barRow(b+" hari",T.b[i],mx,'<span class="num">'+fmtRupiah(T.b[i])+'</span>'); });
+    html+='</div><div class="panel"><h3>Umur &gt;120 hari per kategori</h3>';
+    var ks=c.K.slice().sort(function(a,b){return b.b4-a.b4;}), mk=ks.length?Math.max(ks[0].b4,1):1;
+    ks.forEach(function(k){ html+=barRow(k.name,k.b4,mk,'<span class="num">'+fmtRupiah(k.b4)+'</span>'); });
+    html+='</div></div><div class="panel"><h3>10 gudang dengan stok &gt;120 hari terbesar</h3>';
+    var gs=c.G.slice().sort(function(a,b){return b.b4-a.b4;}).slice(0,10), mg=gs.length?Math.max(gs[0].b4,1):1;
+    gs.forEach(function(g){ html+=barRow(g.name,g.b4,mg,'<span class="num">'+fmtRupiah(g.b4)+'</span>'); });
+    return html+'</div>';
+  }
+
+  function renderUmurTable(scope){
+    var c=umurCompute(), u=state.umur, rows=scope==="gudang"?c.G:c.K, s=u.sort[scope];
+    rows=sortRows(rows,s.key,s.dir);
+    var tot=[0,0,0,0,0,0];
+    rows.forEach(function(r){ tot[0]+=r.total; for(var i=0;i<5;i++) tot[i+1]+=r["b"+i]; });
+    var html=umurWarn();
+    html+='<p class="lede">Nilai persediaan (Rupiah) per '+(scope==="gudang"?"gudang":"kategori")+', dibagi menurut umur sejak pembelian terakhir (acuan '+esc(u.ref)+').</p>';
+    html+='<div class="table-wrap"><table><thead><tr>'+th2("name",scope==="gudang"?"Gudang":"Kategori","left",s,"umur")+th2("total","Total","num",s,"umur");
+    BK.forEach(function(b,i){ html+=th2("b"+i,b,"num",s,"umur"); });
+    html+='</tr></thead><tbody>';
+    var page=u.page[scope], size=u.pageSize[scope], pr=paginate(rows,page,size);
+    if(!pr.length) html+='<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-secondary)">Tidak ada data untuk filter ini.</td></tr>';
+    pr.forEach(function(r){
+      html+='<tr><td class="name-cell"><div class="name-primary">'+esc(r.name)+'</div></td><td class="num">'+fmtNum(r.total)+'</td>';
+      for(var i=0;i<5;i++) html+='<td class="num"'+(i===4&&r.b4>0?' style="color:var(--danger)"':'')+'>'+(r["b"+i]?fmtNum(r["b"+i]):'-')+'</td>';
+      html+='</tr>';
+    });
+    html+='</tbody></table>'+tableFoot2(rows.length,page,size,scope,"umur")+'</div>';
+    html+='<div class="note">Total pada filter saat ini: <strong class="num">'+fmtRupiah(tot[0])+'</strong> · &gt;120 hari: <strong class="num">'+fmtRupiah(tot[5])+'</strong></div>';
+    return html;
+  }
+
+  function renderUmurImport(){
+    var u=state.umur, html='<div class="import-shell">'+cloudBanner("umur");
+    html+='<p class="lede">Upload laporan pembelian (.xlsx / .xls / .csv), boleh beberapa file sekaligus (farmasi, logistik, apotek). Yang dipakai hanya kolom Nama Barang dan Tanggal Pembelian (atau Tanggal). Data stok diambil dari modul Farmasi dan Logistik yang sudah dimuat.</p>';
+    html+='<div class="dropzone" id="dz-umur" data-action="pick-umur"><div class="ic">⇪</div><div class="title">Tarik file ke sini atau klik untuk memilih</div><div class="hint">Mendukung .xlsx, .xls, dan .csv, bisa lebih dari satu file</div></div>';
+    html+='<input type="file" id="file-umur" accept=".xlsx,.xls,.csv" multiple>';
+    html+='<div class="note"><label><input type="checkbox" data-action="umur-merge"'+(u.merge?" checked":"")+'> Gabungkan dengan data pembelian yang sedang dimuat (ambil tanggal terbaru per barang)</label></div>';
+    if(u.loaded){
+      var mxd=0; u.rows.forEach(function(r){ if(r.tgl>mxd) mxd=r.tgl; });
+      html+='<div class="import-summary">';
+      html+='<div class="row"><span>File aktif</span><span class="v">'+esc(u.filename)+'</span></div>';
+      html+='<div class="row"><span>Barang unik dengan riwayat pembelian</span><span class="v">'+fmtNum(u.rows.length)+'</span></div>';
+      if(u.lines!==undefined) html+='<div class="row"><span>Baris pembelian dibaca</span><span class="v">'+fmtNum(u.lines)+'</span></div>';
+      html+='<div class="row"><span>Baris dilewati</span><span class="v">'+fmtNum(u.skipped||0)+'</span></div>';
+      html+='<div class="row"><span>Pembelian terbaru</span><span class="v">'+esc(dayToIso(mxd))+'</span></div></div>';
+      html+='<div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">';
+      html+='<button class="btn btn-save" data-action="save-umur" '+(u.cloudStatus==="saving"?"disabled":"")+'>💾 '+(u.cloudStatus==="saving"?"Menyimpan…":"Simpan ke GitHub")+'</button>';
+      html+='<button class="btn" data-action="clear-umur">Hapus dari tampilan ini</button></div>';
+      if(!ghConfigured()) html+='<div class="note">Atur GitHub dulu (tombol ⚙️ di kanan atas) supaya tombol simpan ini aktif.</div>';
+    }
+    html+='<div class="note">Pembelian dicocokkan ke stok lewat nama barang (huruf besar/kecil diabaikan). Umur = tanggal acuan dikurangi tanggal pembelian terakhir; barang tanpa riwayat pembelian memakai tanggal default. Yang disimpan ke GitHub hanya nama barang dan tanggal pembelian terakhirnya.</div>';
+    return html+'</div>';
   }
 
   /* ============================= INIT ============================= */
