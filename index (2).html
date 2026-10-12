@@ -278,6 +278,25 @@
   :root[data-theme="dark"] .watermark{
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='180'%3E%3Cdefs%3E%3Cpattern id='wm' width='360' height='180' patternUnits='userSpaceOnUse' patternTransform='rotate(-28)'%3E%3Ctext x='10' y='105' font-family='Work Sans, sans-serif' font-size='24' font-weight='700' fill='rgba(231,236,238,0.07)' textLength='330' lengthAdjust='spacingAndGlyphs'%3EPENGADAAN %26 LOGISTIK%3C/text%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23wm)'/%3E%3C/svg%3E");
   }
+  #print-area{display:none;}
+  @media print{
+    @page{ size:A4 landscape; margin:12mm; }
+    body.printing > *:not(#print-area){ display:none !important; }
+    body.printing #print-area{ display:block; color:#000; font:10pt/1.35 Arial,Helvetica,sans-serif; }
+    body.printing{ background:#fff !important; }
+    .pr-title{ font-size:15pt; font-weight:700; margin-bottom:6px; }
+    .pr-info{ border-collapse:collapse; margin-bottom:10px; font-size:9.5pt; }
+    .pr-info td{ padding:1px 6px 1px 0; vertical-align:top; }
+    .pr-h{ font-size:11.5pt; margin:14px 0 5px; }
+    .pr-t{ width:100%; border-collapse:collapse; font-size:9pt; }
+    .pr-t th{ background:#ffff00 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; border:1px solid #777; padding:3px 5px; text-align:center; }
+    .pr-t td{ border:1px solid #aaa; padding:2px 5px; }
+    .pr-t td.r{ text-align:right; white-space:nowrap; }
+    .pr-t thead{ display:table-header-group; }
+    .pr-t tr{ page-break-inside:avoid; }
+    .pr-total td{ font-weight:700; background:#eee !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .pr-note{ font-size:8.5pt; margin-top:4px; }
+  }
 </style>
 </head>
 <body>
@@ -1321,6 +1340,7 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
         ? '<span class="badge badge-ok">'+fmtNum(state.logistik.rows.length)+' baris dimuat</span>'
         : '<span class="badge badge-off">Belum ada data</span>';
     }
+    html += printButtons(m, tab);
     html += '</div></div>';
     return html;
   }
@@ -2079,6 +2099,11 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
         document.getElementById("file-farmasi").click();
       } else if(action==="pick-logistik"){
         document.getElementById("file-logistik").click();
+      } else if(action==="print-view" || action==="export-xlsx"){
+        var pm=state.currentModule, ptab=state.activeTab[pm];
+        if(!canPrint(pm,ptab)) return;
+        var sp=buildSpec(pm,ptab);
+        if(action==="print-view") doPrint(sp); else exportXlsx(sp);
       } else if(action==="pick-master"){
         document.getElementById("file-master").click();
       } else if(action==="save-master"){
@@ -2497,6 +2522,188 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
     }
     html+='<div class="note">Pembelian dicocokkan ke stok lewat nama barang (huruf besar/kecil diabaikan). Umur = tanggal acuan dikurangi tanggal pembelian terakhir; barang tanpa riwayat pembelian memakai tanggal default. Yang disimpan ke GitHub hanya nama barang dan tanggal pembelian terakhirnya.</div>';
     return html+'</div>';
+  }
+
+  /* ============================= CETAK & EXPORT EXCEL ============================= */
+
+  var PRINTABLE = { farmasi:["ringkasan","gudang","kategori","detail"], logistik:["ringkasan","gudang","golongan","detail"], umur:["ringkasan","gudang","kategori","detail"] };
+  function canPrint(m,tab){
+    if(!PRINTABLE[m] || PRINTABLE[m].indexOf(tab)<0) return false;
+    return m==="umur" ? (state.farmasi.loaded || state.logistik.loaded) : !!state[m].loaded;
+  }
+  function printButtons(m,tab){
+    if(!canPrint(m,tab)) return "";
+    return '<button class="btn small" data-action="print-view">🖨 Cetak</button><button class="btn small" data-action="export-xlsx">⬇ Excel (.xlsx)</button>';
+  }
+
+  function sumCol(rows,i){ return rows.reduce(function(a,r){ return a+(Number(r[i])||0); },0); }
+  function srt(m,scope){ return (state[m].sort && state[m].sort[scope]) || {key:"nilai",dir:"desc"}; }
+  var ST_FARM = {unset:"Belum ada batas", ok:"Dalam batas", over:"Melebihi batas"};
+  var SPEC_TITLE = {ringkasan:"Ringkasan", gudang:"Rekap per Gudang", kategori:"Rekap per Kategori", golongan:"Rekap per Golongan", detail:"Detail Barang"};
+
+  function tblKpi(items){ return {name:"Ringkasan", cols:[{h:"Indikator",t:"s",w:46},{h:"Nilai",t:"n",w:22}], rows:items}; }
+  function tblGudang(m,rows){
+    var s=srt(m,"gudang"), agg=sortRows(aggregateByGudang(rows),s.key,s.dir), fa=(m==="farmasi");
+    var cols=[{h:"Gudang",t:"s",w:46},{h:"Jml item",t:"n",w:12},{h:"Total qty",t:"n",w:14},{h:"Nilai persediaan",t:"n",w:20}];
+    if(fa) cols.push({h:"Batas",t:"n",w:18},{h:"% dari batas",t:"p",w:13},{h:"Status",t:"s",w:16});
+    var r=agg.map(function(g){ var a=[g.gudang,g.items,g.qty,g.nilai]; if(fa) a.push(g.batas,(g.pct===null||g.pct>=9999)?null:g.pct,ST_FARM[g.status]); return a; });
+    var t=["Total",null,sumCol(r,2),sumCol(r,3)]; if(fa) t.push(null,null,null);
+    return {name:"Rekap Per Gudang", cols:cols, rows:r, total:t};
+  }
+  function tblKategori(m,rows){
+    var fa=(m==="farmasi"), s=srt(m,fa?"kategori":"golongan"), agg=sortRows(aggregateByKategori(rows),s.key,s.dir), lbl=fa?"Kategori":"Golongan";
+    var r=agg.map(function(k){ return [k.kategori,k.itemCount,k.qty,k.nilai,k.share]; });
+    return {name:"Rekap Per "+lbl, cols:[{h:lbl,t:"s",w:38},{h:"Item unik",t:"n",w:12},{h:"Total qty",t:"n",w:14},{h:"Nilai persediaan",t:"n",w:20},{h:"% dari total",t:"p",w:13}], rows:r, total:["Total",null,sumCol(r,2),sumCol(r,3),sumCol(r,4)]};
+  }
+  function tblTopFarmasi(rows,n){
+    var agg=sortRows(aggregateDetail(rows),"nilai","desc"), tot=sumCol(agg.map(function(x){return [x.nilai];}),0), top=agg.slice(0,n);
+    var r=top.map(function(it){ return [it.namaBarang,it.kategori,it.qty,it.nilai,tot>0?it.nilai/tot*100:0]; });
+    return {name:"Top "+n+" Barang (Nilai)", cols:[{h:"Nama barang",t:"s",w:50},{h:"Kategori",t:"s",w:18},{h:"Total qty",t:"n",w:14},{h:"Nilai persediaan",t:"n",w:20},{h:"% dari total",t:"p",w:13}], rows:r};
+  }
+  function tblDetail(m,rows){
+    var fa=(m==="farmasi"), s=srt(m,"detail"), agg;
+    if(fa) agg=aggregateDetail(rows);
+    else { agg=logistikDetailRows(rows); var st=state.logistik.filters.status; if(st && st!=="all") agg=agg.filter(function(it){ return String(it.stNum)===st; }); }
+    agg=sortRows(agg,s.key,s.dir);
+    var cols,r,t;
+    if(fa){
+      cols=[{h:"Nama barang",t:"s",w:52},{h:"Kategori",t:"s",w:18},{h:"Jml gudang",t:"n",w:12},{h:"Total qty",t:"n",w:14},{h:"Nilai persediaan",t:"n",w:20}];
+      r=agg.map(function(it){ return [it.namaBarang,it.kategori,it.gudangCount,it.qty,it.nilai]; }); t=["Total",null,null,sumCol(r,3),sumCol(r,4)];
+    } else {
+      cols=[{h:"Nama barang",t:"s",w:52},{h:"Golongan",t:"s",w:28},{h:"Jml gudang",t:"n",w:12},{h:"Total qty",t:"n",w:14},{h:"Satuan",t:"s",w:10},{h:"Stok min",t:"n",w:10},{h:"Stok maks",t:"n",w:10},{h:"Status stok",t:"s",w:18},{h:"Nilai persediaan",t:"n",w:20}];
+      r=agg.map(function(it){ return [it.namaBarang,it.kategori,it.gudangCount,it.qty,it.satuan||"",it.minStok,it.maxStok,ST_LABEL[it.stNum],it.nilai]; }); t=["Total",null,null,sumCol(r,3),null,null,null,null,sumCol(r,8)];
+    }
+    return {name:"Detail Barang", cols:cols, rows:r, total:t};
+  }
+  var UB = ["<30","31-60","61-90","91-120",">120"];
+  function tblUmur(scope,c){
+    var u=state.umur, s=u.sort[scope], rows=sortRows(scope==="gudang"?c.G:c.K,s.key,s.dir);
+    var cols=[{h:scope==="gudang"?"Nama Gudang":"Kategori",t:"s",w:scope==="gudang"?55:40},{h:"Total",t:"n",w:18}].concat(UB.map(function(b){ return {h:b,t:"n",w:16}; }));
+    var r=rows.map(function(o){ return [o.name,o.total,o.b0,o.b1,o.b2,o.b3,o.b4]; }), t=["Total"];
+    for(var i=1;i<=6;i++) t.push(sumCol(r,i));
+    return {name:scope==="gudang"?"Rekap Per Warhouse":"Rekap Per Kategori", cols:cols, rows:r, total:t};
+  }
+  function tblUmurDetail(){
+    var u=state.umur, s=u.sort.detail, rows=sortRows(umurDetailRows(),s.key,s.dir);
+    var r=rows.map(function(o){ return [o.name,o.sumber,o.kategori,o.gudangCount,o.qty,o.nilai,o.has?dayToIso(o.lt):"Tidak ada riwayat",o.days,UB[o.b]+" hari"]; });
+    return {name:"Detail Barang", cols:[{h:"Nama barang",t:"s",w:52},{h:"Sumber",t:"s",w:11},{h:"Kategori",t:"s",w:18},{h:"Jml gudang",t:"n",w:12},{h:"Total qty",t:"n",w:12},{h:"Nilai persediaan",t:"n",w:20},{h:"Pembelian terakhir",t:"s",w:20},{h:"Umur (hari)",t:"n",w:12},{h:"Kelompok umur",t:"s",w:16}], rows:r, total:["Total",null,null,null,sumCol(r,4),sumCol(r,5),null,null,null]};
+  }
+
+  function buildSpec(m,tab){
+    var info=[], sheets=[], title;
+    if(m==="farmasi" || m==="logistik"){
+      var fa=(m==="farmasi"), F=state[m], f=F.filters, rows=fa?applyFarmasiFilters(F.rows):applyLogistikFilters(F.rows), gk=fa?f.kategori:f.golongan;
+      title=(fa?"Persediaan Farmasi":"Persediaan Logistik")+" - "+SPEC_TITLE[tab];
+      info=[["Sumber data",F.filename||"-"],["Gudang",f.gudang==="all"?"Semua gudang":f.gudang],[fa?"Kategori":"Golongan",gk==="all"?(fa?"Semua kategori":"Semua golongan"):gk]];
+      if(f.q) info.push(["Pencarian",f.q]);
+      if(!fa && tab==="detail" && f.status && f.status!=="all") info.push(["Status stok",ST_LABEL[+f.status]]);
+      if(tab==="ringkasan"){
+        var det=aggregateDetail(rows), gs={}; rows.forEach(function(r){ gs[r.gudang]=1; });
+        var kp=[["Total nilai persediaan (Rp)",sumCol(rows.map(function(r){return [r.persediaan];}),0)],["Total qty",sumCol(rows.map(function(r){return [r.qty];}),0)],["Jumlah gudang",Object.keys(gs).length],["Jumlah barang unik",det.length]];
+        if(!fa){ var sc=logistikStatusStats(rows); kp.push(["Item di bawah stok minimum",sc[0]],["Item melebihi stok maksimum",sc[2]],["Item stok normal",sc[1]]); }
+        sheets=[tblKpi(kp),tblGudang(m,rows),tblKategori(m,rows)];
+        if(fa) sheets.push(tblTopFarmasi(rows,20));
+      } else if(tab==="gudang") sheets=[tblGudang(m,rows)];
+      else if(tab==="detail") sheets=[tblDetail(m,rows)];
+      else sheets=[tblKategori(m,rows)];
+    } else {
+      var u=state.umur, uf=u.filters, c=umurCompute();
+      title="Umur Persediaan - "+SPEC_TITLE[tab];
+      var st=[]; if(state.farmasi.loaded) st.push(state.farmasi.filename); if(state.logistik.loaded) st.push(state.logistik.filename);
+      info=[["Data stok",st.join(", ")||"-"],["Laporan pembelian",u.loaded?u.filename:"Belum dimuat (semua barang memakai tanggal default)"],["Tanggal acuan",u.ref],["Tanggal bila tanpa pembelian",u.def],
+            ["Sumber",uf.sumber==="all"?"Farmasi + Logistik":uf.sumber],["Gudang",uf.gudang==="all"?"Semua gudang":uf.gudang],["Kategori",uf.kategori==="all"?"Semua kategori":uf.kategori]];
+      if(tab==="detail"){ if(uf.q) info.push(["Pencarian",uf.q]); if(uf.bucket && uf.bucket!=="all") info.push(["Kelompok umur",UB[+uf.bucket]+" hari"]); }
+      info.push(["Total persediaan (Rp)",fmtNum(c.T.v)],["Umur >120 hari (Rp)",fmtNum(c.T.b[4])]);
+      if(tab==="ringkasan") sheets=[tblUmur("kategori",c),tblUmur("gudang",c)];
+      else if(tab==="gudang") sheets=[tblUmur("gudang",c)];
+      else if(tab==="kategori") sheets=[tblUmur("kategori",c)];
+      else sheets=[tblUmurDetail()];
+    }
+    var d=new Date(), iso=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+    return {title:title, info:info, sheets:sheets, file:title.replace(/[^A-Za-z0-9]+/g,"_")+"_"+iso};
+  }
+
+  function prCell(v,c){
+    var s = (v===null||v===undefined||v==="") ? "" : (c.t==="n" ? fmtNum(v) : (c.t==="p" ? fmtPct(v) : esc(v)));
+    return '<td'+(c.t==="s"?"":' class="r"')+'>'+s+'</td>';
+  }
+  function printHtml(spec){
+    var MAXR=3000, h='<div class="pr-title">'+esc(spec.title)+'</div><table class="pr-info">';
+    spec.info.concat([["Dicetak",new Date().toLocaleString("id-ID")]]).forEach(function(i){ h+='<tr><td>'+esc(i[0])+'</td><td>: '+esc(i[1])+'</td></tr>'; });
+    h+='</table>';
+    spec.sheets.forEach(function(sh){
+      h+='<h2 class="pr-h">'+esc(sh.name)+'</h2><table class="pr-t"><thead><tr>'+sh.cols.map(function(c){ return '<th>'+esc(c.h)+'</th>'; }).join("")+'</tr></thead><tbody>';
+      sh.rows.slice(0,MAXR).forEach(function(r){ h+='<tr>'+r.map(function(v,i){ return prCell(v,sh.cols[i]); }).join("")+'</tr>'; });
+      if(sh.total) h+='<tr class="pr-total">'+sh.total.map(function(v,i){ return prCell(v,sh.cols[i]); }).join("")+'</tr>';
+      h+='</tbody></table>';
+      if(sh.rows.length>MAXR) h+='<div class="pr-note">Hanya '+fmtNum(MAXR)+' dari '+fmtNum(sh.rows.length)+' baris yang dicetak. Gunakan Excel (.xlsx) untuk data lengkap.</div>';
+    });
+    return h;
+  }
+  function doPrint(spec){
+    var pa=document.getElementById("print-area");
+    if(!pa){ pa=document.createElement("div"); pa.id="print-area"; document.body.appendChild(pa); }
+    pa.innerHTML=printHtml(spec);
+    document.body.classList.add("printing");
+    var done=function(){ document.body.classList.remove("printing"); window.removeEventListener("afterprint",done); };
+    window.addEventListener("afterprint",done);
+    setTimeout(function(){ window.print(); },60);
+  }
+
+  function loadExcelJS(){
+    return new Promise(function(res,rej){
+      if(window.ExcelJS) return res(window.ExcelJS);
+      var s=document.createElement("script");
+      s.src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";
+      s.onload=function(){ window.ExcelJS ? res(window.ExcelJS) : rej(new Error("ExcelJS tidak tersedia")); };
+      s.onerror=function(){ rej(new Error("gagal memuat ExcelJS")); };
+      document.head.appendChild(s);
+    });
+  }
+  function saveBlob(buf,name){
+    var blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+    var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name;
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1000);
+  }
+  function exportXlsx(spec){
+    var B={style:"thin",color:{argb:"FF999999"}}, BRD={top:B,left:B,bottom:B,right:B};
+    loadExcelJS().then(function(E){
+      var wb=new E.Workbook(); wb.creator="Dashboard Persediaan";
+      spec.sheets.forEach(function(sh){
+        var ws=wb.addWorksheet(sh.name.slice(0,31));
+        ws.columns=sh.cols.map(function(c){ return {width:c.w||16}; });
+        ws.addRow(sh.cols.map(function(c){ return c.h; })).eachCell(function(cell){
+          cell.font={bold:true}; cell.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FFFFFF00"}};
+          cell.alignment={horizontal:"center",vertical:"middle"}; cell.border=BRD;
+        });
+        var put=function(arr,bold){
+          var row=ws.addRow(arr.map(function(v,i){ return (sh.cols[i].t==="p" && v!==null && v!==undefined) ? v/100 : (v===undefined?null:v); }));
+          row.eachCell({includeEmpty:true},function(cell,ci){
+            var c=sh.cols[ci-1]; if(!c) return;
+            if(c.t==="n") cell.numFmt="#,##0"; else if(c.t==="p") cell.numFmt="0.0%";
+            cell.border=BRD; if(bold) cell.font={bold:true};
+          });
+        };
+        sh.rows.forEach(function(r){ put(r,false); });
+        if(sh.total) put(sh.total,true);
+        ws.views=[{state:"frozen",ySplit:1}];
+      });
+      var wi=wb.addWorksheet("Info"); wi.columns=[{width:30},{width:80}];
+      [["Laporan",spec.title]].concat(spec.info).concat([["Dibuat",new Date().toLocaleString("id-ID")]]).forEach(function(i){ wi.addRow(i); });
+      return wb.xlsx.writeBuffer();
+    }).then(function(buf){ saveBlob(buf,spec.file+".xlsx"); })
+    .catch(function(err){
+      try{
+        var wb=XLSX.utils.book_new();
+        spec.sheets.forEach(function(sh){
+          var aoa=[sh.cols.map(function(c){ return c.h; })].concat(sh.rows); if(sh.total) aoa.push(sh.total);
+          XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aoa),sh.name.slice(0,31));
+        });
+        XLSX.writeFile(wb,spec.file+".xlsx");
+        alert("File Excel dibuat tanpa pewarnaan header karena pustaka ExcelJS gagal dimuat ("+err.message+").");
+      }catch(e2){ alert("Gagal membuat file Excel: "+e2.message); }
+    });
   }
 
   /* ============================= INIT ============================= */
