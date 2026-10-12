@@ -278,6 +278,10 @@
   :root[data-theme="dark"] .watermark{
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='180'%3E%3Cdefs%3E%3Cpattern id='wm' width='360' height='180' patternUnits='userSpaceOnUse' patternTransform='rotate(-28)'%3E%3Ctext x='10' y='105' font-family='Work Sans, sans-serif' font-size='24' font-weight='700' fill='rgba(231,236,238,0.07)' textLength='330' lengthAdjust='spacingAndGlyphs'%3EPENGADAAN %26 LOGISTIK%3C/text%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23wm)'/%3E%3C/svg%3E");
   }
+  .page-actions{display:flex; justify-content:flex-end; gap:8px; margin-bottom:12px; flex-wrap:wrap;}
+  .entity-switch{margin:2px 0 14px;}
+  .entity-switch label{display:block; font-size:11px; opacity:.75; margin:0 0 4px 2px;}
+  .entity-switch select{width:100%; padding:7px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--ink); font-size:12.5px;}
   #print-area{display:none;}
   @media print{
     @page{ size:A4 landscape; margin:12mm; }
@@ -344,6 +348,12 @@
     "stokmaksimal":"stokMaksimal", "stokminimal":"stokMinimal", "batch":"batch"
   };
 
+  // Format klinik/apotek: Gudang, Kode Barang, Barang, Jumlah Stok, Harga Pokok (tanpa kolom Persediaan; nilai = Jumlah Stok x Harga Pokok)
+  var KLINIK_HEADER_MAP = {
+    "gudang":"namaGudang", "kodebarang":"kodeBarang", "barang":"namaBarang", "jumlahstok":"qty",
+    "hargapokok":"hargaPokok", "status":"status", "batch":"batch"
+  };
+
   var LOG_HEADER_MAP = {
     "barang":"namaBarang", "kodebarang":"kodeBarang", "idbarang":"idBarang", "gudang":"gudang",
     "golongan":"golongan", "qty":"qty", "hargapokok":"hargaPokok", "persediaan":"persediaan",
@@ -373,7 +383,8 @@
       pageSize:{ gudang:25, golongan:25, detail:25 }
     }
   };
-  state.master = { loaded:false, filename:null, rows:[], skipped:0, cloudStatus:"idle", cloudMessage:null, activeUploadPath:null, uploads:[] };
+  state.entity = (function(){ try{ return localStorage.getItem("stokdash_entity_v1")==="cnh" ? "cnh" : "cn"; }catch(x){ return "cn"; } })();
+state.master = { loaded:false, filename:null, rows:[], skipped:0, cloudStatus:"idle", cloudMessage:null, activeUploadPath:null, uploads:[] };
 state.activeTab.umur = "ringkasan";
 state.umur = {
   loaded:false, filename:null, rows:[], skipped:0, lines:undefined, merge:false,
@@ -402,7 +413,7 @@ state.cloudAvailable = undefined; // undefined = checking, true/false once known
   var OVERRIDES_KEY = "stokdash_overrides_v1";
   var CLOUD_HISTORY_LIMIT_DEFAULT = 15; // fallback if ghConfig.historyLimit is unset
 
-  var FARMASI_FIELDS  = ["gudang","kodeBarang","idBarang","namaBarang","qty","hargaPokok","persediaan","kategori","status"];
+  var FARMASI_FIELDS  = ["gudang","kodeBarang","idBarang","namaBarang","qty","hargaPokok","persediaan","kategori","status","sumber"];
   var LOGISTIK_FIELDS = ["gudang","kodeBarang","idBarang","namaBarang","qty","hargaPokok","persediaan","kategori","produsen","status"];
 var UMUR_FIELDS = ["nama","tgl"];
 var MASTER_FIELDS = ["id","nama","min","max","satuan","akun","status"];
@@ -423,12 +434,12 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
 
   function loadOverridesLocal(){
     try{
-      var raw = localStorage.getItem(OVERRIDES_KEY);
+      var raw = localStorage.getItem(ovKey());
       if(raw) overrides = JSON.parse(raw) || {};
     }catch(e){}
   }
   function saveOverrides(){
-    try{ localStorage.setItem(OVERRIDES_KEY, JSON.stringify(overrides)); }catch(e){}
+    try{ localStorage.setItem(ovKey(), JSON.stringify(overrides)); }catch(e){}
   }
 
   // ---- base64 helpers that survive UTF-8 (Indonesian text) and multi-MB payloads ----
@@ -453,7 +464,7 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
     return String(s||"file").toLowerCase().replace(/\.[^.]+$/,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"").slice(0,40) || "file";
   }
   function isoStamp(){ return new Date().toISOString().replace(/[:.]/g,"-"); }
-  function ghDataPath(moduleKey){ return "data/"+moduleKey; }
+  function ghDataPath(moduleKey){ return "data/"+ENTITIES[state.entity].prefix+moduleKey; }
 
   async function ghRequest(method, path, body){
     var opts = { method: method, headers: {
@@ -558,7 +569,7 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
 
   async function ghLoadOverridesRemote(){
     try{
-      var meta = await ghRequest("GET", "/contents/data/farmasi/_overrides.json?ref="+encodeURIComponent(ghConfig.branch));
+      var meta = await ghRequest("GET", "/contents/"+ghDataPath("farmasi")+"/_overrides.json?ref="+encodeURIComponent(ghConfig.branch));
       var json = JSON.parse(b64ToUtf8(meta.content));
       return { overrides: json.overrides||{}, sha: meta.sha };
     }catch(err){ return null; }
@@ -573,11 +584,12 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
         branch: ghConfig.branch
       };
       if(existing && existing.sha) body.sha = existing.sha;
-      await ghRequest("PUT", "/contents/data/farmasi/_overrides.json", body);
+      await ghRequest("PUT", "/contents/"+ghDataPath("farmasi")+"/_overrides.json", body);
     }catch(e){}
   }
 
   function applyLoadedUpload(moduleKey, fields, file, res){
+    if(file && file.path && file.path.indexOf(ghDataPath(moduleKey)+"/")!==0) return;
     var st = state[moduleKey];
     if(!res){ st.cloudStatus="error"; st.cloudMessage="Gagal memuat data dari GitHub."; return; }
     var rows = res.rows;
@@ -680,35 +692,42 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
   }
 
   async function initGithub(){
+    var ep = ++initEpoch;
     loadGhConfig();
     loadOverridesLocal();
     if(!ghConfigured()){ state.cloudAvailable=false; render(); return; }
     state.cloudAvailable = undefined; render();
     var test = await ghTestConnection();
+    if(ep!==initEpoch) return;
     state.cloudAvailable = test.ok;
     state.cloudConnError = test.ok ? null : test.message;
     if(!test.ok){ render(); return; }
 
     var remoteOv = await ghLoadOverridesRemote();
+    if(ep!==initEpoch) return;
     if(remoteOv){ overrides = remoteOv.overrides || {}; saveOverrides(); }
 
     var lists = await Promise.all([
       ghListUploads("farmasi").catch(function(){ return []; }),
       ghListUploads("logistik").catch(function(){ return []; })
     ]);
+    if(ep!==initEpoch) return;
     state.farmasi.uploads = lists[0];
     state.logistik.uploads = lists[1];
 
     var loads = [];
   var uList = await ghListUploads("umur").catch(function(){ return []; });
+  if(ep!==initEpoch) return;
   state.umur.uploads = uList;
   if(uList.length) loads.push(ghLoadUpload(uList[0], UMUR_FIELDS).then(function(res){ applyLoadedUpload("umur", UMUR_FIELDS, uList[0], res); }).catch(function(){}));
   var mList = await ghListUploads("master").catch(function(){ return []; });
+  if(ep!==initEpoch) return;
   state.master.uploads = mList;
   if(mList.length) loads.push(ghLoadUpload(mList[0], MASTER_FIELDS).then(function(res){ applyLoadedUpload("master", MASTER_FIELDS, mList[0], res); }).catch(function(){}));
     if(lists[0].length) loads.push(ghLoadUpload(lists[0][0], FARMASI_FIELDS).then(function(res){ applyLoadedUpload("farmasi", FARMASI_FIELDS, lists[0][0], res); }).catch(function(){}));
     if(lists[1].length) loads.push(ghLoadUpload(lists[1][0], LOGISTIK_FIELDS).then(function(res){ applyLoadedUpload("logistik", LOGISTIK_FIELDS, lists[1][0], res); }).catch(function(){}));
     await Promise.all(loads);
+    if(ep!==initEpoch) return;
     render();
   }
 
@@ -850,6 +869,8 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
   function getCategory(row){
     var key = itemKey(row);
     if(overrides[key] && CATEGORIES.indexOf(overrides[key]) !== -1) return overrides[key];
+    // File klinik: nama barang tanpa kode di depan (mis. "Crem 5g"), jadi angka pertama diambil dari Kode Barang
+    if(row.sumber==="Klinik") return autoClassify(row.kodeBarang, row.namaBarang);
     return autoClassify(row.namaBarang, row.kodeBarang);
   }
 
@@ -889,9 +910,12 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
 
     var headerKeys = Object.keys(raw[0]);
     var fieldByHeader = {};
+    var norms = headerKeys.map(normalizeHeader);
+    var isKlinik = norms.indexOf("namagudang")<0 && norms.indexOf("gudang")>=0 && norms.indexOf("barang")>=0;
+    var MAPX = isKlinik ? KLINIK_HEADER_MAP : HEADER_MAP;
     headerKeys.forEach(function(h){
       var norm = normalizeHeader(h);
-      if(HEADER_MAP[norm]) fieldByHeader[h] = HEADER_MAP[norm];
+      if(MAPX[norm]) fieldByHeader[h] = MAPX[norm];
     });
 
     var rows = [];
@@ -915,7 +939,8 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
         qty: qty,
         hargaPokok: hargaPokok,
         persediaan: isFinite(persediaan) ? persediaan : 0,
-        status: obj.status
+        status: obj.status,
+        sumber: isKlinik ? "Klinik" : "Farmasi"
       };
       row.kategori = getCategory(row);
       rows.push(row);
@@ -923,33 +948,6 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
     return {rows: rows, skipped: skipped};
   }
 
-  function handleFarmasiFile(file){
-    var reader = new FileReader();
-    reader.onload = function(e){
-      try{
-        var data = new Uint8Array(e.target.result);
-        var wb = XLSX.read(data, {type:"array"});
-        var result = parseFarmasiWorkbook(wb);
-        if(!result.rows.length){
-          alert("Tidak ada baris data yang valid ditemukan. Pastikan file memiliki kolom 'Nama Gudang' dan 'Nama Barang'.");
-          return;
-        }
-        state.farmasi.loaded = true;
-        state.farmasi.filename = file.name;
-        state.farmasi.rows = result.rows;
-        state.farmasi.skipped = result.skipped;
-        state.farmasi.filters = {gudang:"all", kategori:"all", q:""};
-        state.farmasi.page = {gudang:1, kategori:1, detail:1};
-        state.activeTab.farmasi = "ringkasan";
-        state.farmasi.activeUploadPath = null;
-        state.farmasi.cloudStatus = "idle"; state.farmasi.cloudMessage = null;
-        render();
-      }catch(err){
-        alert("Gagal membaca file. Pastikan file berformat .xlsx, .xls, atau .csv yang valid.\n\nDetail: " + err.message);
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  }
 
   /* ============================= PARSING (LOGISTIK) ============================= */
 
@@ -1031,6 +1029,7 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
     return rows.filter(function(r){
       if(f.gudang!=="all" && r.gudang!==f.gudang) return false;
       if(f.kategori!=="all" && r.kategori!==f.kategori) return false;
+      if(f.sumber && f.sumber!=="all" && (r.sumber||"Farmasi")!==f.sumber) return false;
       if(f.q && r.namaBarang.toLowerCase().indexOf(f.q.toLowerCase())===-1) return false;
       return true;
     });
@@ -1236,6 +1235,7 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
     var html = '';
     html += '<div class="sidebar">';
     html += '<div class="brand"><div class="brand-mark">💊</div><div class="brand-name">Kendali Stok</div><div class="brand-sub">Farmasi & Logistik</div></div>';
+    html += '<div class="entity-switch"><label>Perusahaan</label><select data-action="switch-entity">'+Object.keys(ENTITIES).map(function(k){ return '<option value="'+k+'"'+(state.entity===k?" selected":"")+'>'+esc(ENTITIES[k].name)+'</option>'; }).join("")+'</select></div>';
     html += '<div class="module-switch">';
     html += '<button class="module-btn'+(m==="farmasi"?" active":"")+'" data-action="switch-module" data-module="farmasi">Farmasi</button>';
     html += '<button class="module-btn'+(m==="logistik"?" active":"")+'" data-action="switch-module" data-module="logistik">Logistik</button>';
@@ -1293,6 +1293,7 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
       html += renderUmurFilterbar();
     }
     html += '<div class="content">';
+    html += renderPageActions(m, tab);
     if(m==="farmasi"){
       if(tab==="ringkasan") html += renderFarmasiRingkasan();
       else if(tab==="import") html += renderFarmasiImport();
@@ -1327,7 +1328,7 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
       umur: state.umur.loaded ? ('Pembelian: '+esc(state.umur.filename)) : "Belum ada laporan pembelian — mulai dari Upload pembelian"
     };
     var html = '<div class="topbar">';
-    html += '<div><h1>'+esc(titles[m][tab])+'</h1><div class="sub">'+subs[m]+'</div></div>';
+    html += '<div><h1>'+esc(titles[m][tab])+'</h1><div class="sub">'+esc(entityName())+' · '+subs[m]+'</div></div>';
     html += '<div class="topbar-right">';
     if(m==="umur"){
       html += umurBadge();
@@ -1340,7 +1341,6 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
         ? '<span class="badge badge-ok">'+fmtNum(state.logistik.rows.length)+' baris dimuat</span>'
         : '<span class="badge badge-off">Belum ada data</span>';
     }
-    html += printButtons(m, tab);
     html += '</div></div>';
     return html;
   }
@@ -1360,6 +1360,12 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
     CATEGORIES.forEach(function(c){ html += '<option value="'+esc(c)+'"'+(f.kategori===c?" selected":"")+'>'+esc(c)+'</option>'; });
     html += '</select></div>';
 
+    var srcs = Array.from(new Set(rows.map(function(r){ return r.sumber||"Farmasi"; }))).sort();
+    if(srcs.length>1){
+      html += '<div class="filter-field"><label>Sumber data</label><select data-action="filter-farmasi" data-key="sumber"><option value="all"'+((!f.sumber||f.sumber==="all")?" selected":"")+'>Semua sumber</option>';
+      srcs.forEach(function(x){ html += '<option value="'+esc(x)+'"'+(f.sumber===x?" selected":"")+'>'+esc(x)+'</option>'; });
+      html += '</select></div>';
+    }
     html += '<div class="filter-field"><label>Cari nama barang</label><input type="text" data-action="search-farmasi" placeholder="Contoh: paracetamol" value="'+esc(f.q)+'"></div>';
     html += '<button class="btn btn-reset" data-action="reset-farmasi-filter">Reset filter</button>';
     html += '</div>';
@@ -1464,12 +1470,12 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
   function renderFarmasiImport(){
     var html = '<div class="import-shell">';
     html += cloudBanner("farmasi");
-    html += '<p class="lede">Import file stok farmasi (.xlsx / .xls / .csv) dengan kolom seperti: ID Gudang, Nama Gudang, Kode Barang, Nama Barang, Qty, Harga Pokok, Persediaan. Kolom lain akan diabaikan secara otomatis.</p>';
+    html += '<p class="lede">Import file stok farmasi (.xlsx / .xls / .csv) dengan kolom seperti: ID Gudang, Nama Gudang, Kode Barang, Nama Barang, Qty, Harga Pokok, Persediaan. Kolom lain akan diabaikan secara otomatis. Bisa banyak file sekaligus: file klinik/apotek (kolom Gudang, Kode Barang, Barang, Jumlah Stok, Harga Pokok) dikenali otomatis dan nilainya dihitung dari Jumlah Stok x Harga Pokok.</p>';
     html += '<div class="dropzone" id="dz-farmasi" data-action="pick-farmasi">';
     html += '<div class="ic">⇪</div><div class="title">Tarik file ke sini atau klik untuk memilih</div>';
     html += '<div class="hint">Mendukung .xlsx, .xls, dan .csv</div>';
     html += '</div>';
-    html += '<input type="file" id="file-farmasi" accept=".xlsx,.xls,.csv">';
+    html += '<input type="file" id="file-farmasi" accept=".xlsx,.xls,.csv" multiple>';
 
     if(state.farmasi.loaded){
       var r = state.farmasi.rows;
@@ -2225,6 +2231,8 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
       } else if(t.dataset && t.dataset.action==="umur-date"){
         if(t.value) state.umur[t.dataset.key] = t.value;
         render();
+      } else if(t.dataset && t.dataset.action==="switch-entity"){
+        switchEntity(t.value);
       } else if(t.dataset && t.dataset.action==="farmasi-topn"){
         state.farmasi.topN = +t.value || 15; render();
       } else if(t.id==="file-master" && t.files && t.files[0]){
@@ -2234,7 +2242,7 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
       } else if(t.id==="file-umur" && t.files && t.files.length){
         handleUmurFiles(t.files);
       } else if(t.id==="file-farmasi" && t.files && t.files[0]){
-        handleFarmasiFile(t.files[0]);
+        handleFarmasiFiles(t.files);
       } else if(t.id==="file-logistik" && t.files && t.files[0]){
         handleLogistikFile(t.files[0]);
       }
@@ -2266,7 +2274,7 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
       el.addEventListener("dragleave", function(){ el.classList.remove("drag"); });
       el.addEventListener("drop", function(e){
         e.preventDefault(); el.classList.remove("drag");
-        if(e.dataTransfer.files && e.dataTransfer.files[0]) handleFarmasiFile(e.dataTransfer.files[0]);
+        if(e.dataTransfer.files && e.dataTransfer.files[0]) handleFarmasiFiles(e.dataTransfer.files);
       });
     });
     var masterZone = document.getElementById("dz-master");
@@ -2384,7 +2392,7 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
 
   function umurStock(){
     var out=[];
-    state.farmasi.rows.forEach(function(r){ out.push({g:r.gudang,n:r.namaBarang,v:r.persediaan,q:r.qty,k:r.kategori,s:"Farmasi"}); });
+    state.farmasi.rows.forEach(function(r){ out.push({g:r.gudang,n:r.namaBarang,v:r.persediaan,q:r.qty,k:r.kategori,s:(r.sumber==="Klinik"?"Klinik":"Farmasi")}); });
     state.logistik.rows.forEach(function(r){ out.push({g:r.gudang,n:r.namaBarang,v:r.persediaan,q:r.qty,k:/suku cadang medis/i.test(r.kategori||"")?"Alkes":"Lain-lain",s:"Logistik"}); });
     return out;
   }
@@ -2428,7 +2436,7 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
 
   function renderUmurFilterbar(){
     var f=state.umur.filters, u=state.umur;
-    var gl={}; umurStock().forEach(function(r){ gl[r.g]=1; });
+    var gl={}, sl2={}; umurStock().forEach(function(r){ gl[r.g]=1; sl2[r.s]=1; });
     var gudangList=Object.keys(gl).sort();
     function sel(key, label, all, opts){
       var h='<div class="filter-field"><label>'+label+'</label><select data-action="filter-umur" data-key="'+key+'">';
@@ -2437,7 +2445,7 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
       return h+'</select></div>';
     }
     var html='<div class="filterbar">';
-    html+=sel("sumber","Sumber","Farmasi + Logistik",["Farmasi","Logistik"]);
+    html+=sel("sumber","Sumber","Semua sumber",Object.keys(sl2).sort());
     html+=sel("gudang","Gudang","Semua gudang",gudangList);
     html+=sel("kategori","Kategori","Semua kategori",CATEGORIES);
     if(state.activeTab.umur==="detail"){
@@ -2594,8 +2602,9 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
     if(m==="farmasi" || m==="logistik"){
       var fa=(m==="farmasi"), F=state[m], f=F.filters, rows=fa?applyFarmasiFilters(F.rows):applyLogistikFilters(F.rows), gk=fa?f.kategori:f.golongan;
       title=(fa?"Persediaan Farmasi":"Persediaan Logistik")+" - "+SPEC_TITLE[tab];
-      info=[["Sumber data",F.filename||"-"],["Gudang",f.gudang==="all"?"Semua gudang":f.gudang],[fa?"Kategori":"Golongan",gk==="all"?(fa?"Semua kategori":"Semua golongan"):gk]];
+      info=[["Perusahaan",entityName()],["Sumber data",F.filename||"-"],["Gudang",f.gudang==="all"?"Semua gudang":f.gudang],[fa?"Kategori":"Golongan",gk==="all"?(fa?"Semua kategori":"Semua golongan"):gk]];
       if(f.q) info.push(["Pencarian",f.q]);
+      if(fa && f.sumber && f.sumber!=="all") info.push(["Sumber",f.sumber]);
       if(!fa && tab==="detail" && f.status && f.status!=="all") info.push(["Status stok",ST_LABEL[+f.status]]);
       if(tab==="ringkasan"){
         var det=aggregateDetail(rows), gs={}; rows.forEach(function(r){ gs[r.gudang]=1; });
@@ -2610,8 +2619,8 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
       var u=state.umur, uf=u.filters, c=umurCompute();
       title="Umur Persediaan - "+SPEC_TITLE[tab];
       var st=[]; if(state.farmasi.loaded) st.push(state.farmasi.filename); if(state.logistik.loaded) st.push(state.logistik.filename);
-      info=[["Data stok",st.join(", ")||"-"],["Laporan pembelian",u.loaded?u.filename:"Belum dimuat (semua barang memakai tanggal default)"],["Tanggal acuan",u.ref],["Tanggal bila tanpa pembelian",u.def],
-            ["Sumber",uf.sumber==="all"?"Farmasi + Logistik":uf.sumber],["Gudang",uf.gudang==="all"?"Semua gudang":uf.gudang],["Kategori",uf.kategori==="all"?"Semua kategori":uf.kategori]];
+      info=[["Perusahaan",entityName()],["Data stok",st.join(", ")||"-"],["Laporan pembelian",u.loaded?u.filename:"Belum dimuat (semua barang memakai tanggal default)"],["Tanggal acuan",u.ref],["Tanggal bila tanpa pembelian",u.def],
+            ["Sumber",uf.sumber==="all"?"Semua sumber":uf.sumber],["Gudang",uf.gudang==="all"?"Semua gudang":uf.gudang],["Kategori",uf.kategori==="all"?"Semua kategori":uf.kategori]];
       if(tab==="detail"){ if(uf.q) info.push(["Pencarian",uf.q]); if(uf.bucket && uf.bucket!=="all") info.push(["Kelompok umur",UB[+uf.bucket]+" hari"]); }
       info.push(["Total persediaan (Rp)",fmtNum(c.T.v)],["Umur >120 hari (Rp)",fmtNum(c.T.b[4])]);
       if(tab==="ringkasan") sheets=[tblUmur("kategori",c),tblUmur("gudang",c)];
@@ -2620,7 +2629,7 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
       else sheets=[tblUmurDetail()];
     }
     var d=new Date(), iso=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
-    return {title:title, info:info, sheets:sheets, file:title.replace(/[^A-Za-z0-9]+/g,"_")+"_"+iso};
+    return {title:title, info:info, sheets:sheets, file:ENTITIES[state.entity].short+"_"+title.replace(/[^A-Za-z0-9]+/g,"_")+"_"+iso};
   }
 
   function prCell(v,c){
@@ -2706,9 +2715,77 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
     });
   }
 
+  /* ============================= PERUSAHAAN (ENTITAS) ============================= */
+
+  // PT Cipta Nirmala memakai folder GitHub lama (data/<modul>), PT Cipta Nirmala Husada memakai data/cnh/<modul>.
+  var ENTITIES = {
+    cn:  { name:"PT Cipta Nirmala",        short:"CN",  prefix:"" },
+    cnh: { name:"PT Cipta Nirmala Husada", short:"CNH", prefix:"cnh/" }
+  };
+  var ENTITY_KEY = "stokdash_entity_v1";
+  var initEpoch = 0;
+  function entityName(){ return ENTITIES[state.entity].name; }
+  function ovKey(){ return OVERRIDES_KEY + (state.entity==="cn" ? "" : "_"+state.entity); }
+  var BUDGET_CN = BUDGET_LOOKUP;
+  function applyEntityBudget(){ BUDGET_LOOKUP = (state.entity==="cn") ? BUDGET_CN : {}; }
+  var INITIAL_MODULES = JSON.stringify({ farmasi:state.farmasi, logistik:state.logistik, umur:state.umur, master:state.master });
+  function resetEntityData(){
+    var o = JSON.parse(INITIAL_MODULES);
+    state.farmasi=o.farmasi; state.logistik=o.logistik; state.umur=o.umur; state.master=o.master;
+    state.activeTab.farmasi="ringkasan"; state.activeTab.logistik="ringkasan"; state.activeTab.umur="ringkasan";
+    overrides = {};
+    try{ destroyAllCharts(); }catch(e){}
+  }
+  function switchEntity(key){
+    if(!ENTITIES[key] || key===state.entity) return;
+    state.entity = key;
+    try{ localStorage.setItem(ENTITY_KEY, key); }catch(e){}
+    applyEntityBudget(); resetEntityData(); loadOverridesLocal();
+    render();
+    initGithub();
+  }
+  function renderPageActions(m,tab){
+    var b = printButtons(m,tab);
+    return b ? '<div class="page-actions">'+b+'</div>' : "";
+  }
+
+  /* ============================= IMPORT FARMASI: BANYAK FILE (FARMASI + KLINIK) ============================= */
+
+  function handleFarmasiFiles(fileList){
+    var files = Array.prototype.slice.call(fileList), all = [], skipped = 0, names = [], bad = [], chain = Promise.resolve();
+    files.forEach(function(f){
+      chain = chain.then(function(){ return new Promise(function(res){
+        var rd = new FileReader();
+        rd.onload = function(e){
+          try{
+            var r = parseFarmasiWorkbook(XLSX.read(new Uint8Array(e.target.result), {type:"array"}));
+            if(r.rows.length){ for(var i=0;i<r.rows.length;i++) all.push(r.rows[i]); skipped += r.skipped; names.push(f.name); } else bad.push(f.name);
+          }catch(err){ bad.push(f.name); }
+          res();
+        };
+        rd.onerror = function(){ bad.push(f.name); res(); };
+        rd.readAsArrayBuffer(f);
+      }); });
+    });
+    return chain.then(function(){
+      if(!all.length){ alert("Tidak ada baris data yang valid ditemukan. Pastikan file punya kolom 'Nama Gudang' dan 'Nama Barang' (format farmasi) atau 'Gudang', 'Barang', 'Jumlah Stok' (format klinik)."+(bad.length?"\n\nTidak terbaca: "+bad.join(", "):"")); return; }
+      var F = state.farmasi;
+      F.loaded = true; F.rows = all; F.skipped = skipped;
+      F.filename = names.length>2 ? (names.slice(0,2).join(", ")+" +"+(names.length-2)+" file") : names.join(", ");
+      F.filters = {gudang:"all", kategori:"all", q:""};
+      F.page = {gudang:1, kategori:1, detail:1};
+      state.activeTab.farmasi = "ringkasan";
+      F.activeUploadPath = null; F.cloudStatus = "idle"; F.cloudMessage = null;
+      render();
+      if(bad.length) alert("File berikut dilewati karena kolomnya tidak dikenali: "+bad.join(", "));
+    });
+  }
+  function handleFarmasiFile(file){ return handleFarmasiFiles([file]); }
+
   /* ============================= INIT ============================= */
 
   loadGhConfig();
+  applyEntityBudget();
   loadOverridesLocal();
   render();
   initGithub();
