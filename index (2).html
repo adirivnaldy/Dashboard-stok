@@ -180,6 +180,10 @@
   .pill-over{background:var(--danger-soft); color:var(--danger);}
   .pill-warn{background:var(--warning-soft); color:var(--warning);}
   .pill-unset{background:var(--surface-2); color:var(--text-secondary); border:1px solid var(--border);}
+  .total-row td{font-weight:700; background:var(--surface-2); border-top:2px solid var(--border);}
+  .mini-bar-row.total-line{border-top:1px solid var(--border); padding-top:10px; margin-top:2px; margin-bottom:0;}
+  .mini-bar-row.total-line .name{font-weight:700; color:var(--ink);}
+  .mini-bar-row.total-line .mini-bar-val{font-weight:700; color:var(--ink);}
   .cat-select{font-family:inherit; font-size:12px; padding:3px 6px; border-radius:6px; border:1px solid var(--border); background:var(--surface); color:var(--text);}
 
   .table-foot{display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-top:1px solid var(--border); background:var(--surface-2); font-size:12.5px; color:var(--text-secondary); flex-wrap:wrap; gap:10px;}
@@ -319,20 +323,20 @@
   var overrides = {}; // itemKey -> manual kategori override, cached in localStorage + synced to GitHub
 
   var BUDGET_TABLE = [
-    {code:"122", nama:"122 - INSTALASI LABORATORIUM GRESIK", batas:308412293},
-    {code:"121", nama:"121 - INSTALASI BEDAH SENTRAL (IBS)", batas:465350818},
-    {code:"152", nama:"152 - DEPO FARMASI IGD", batas:388248892},
-    {code:"102", nama:"102 - Gudang Obat PT CN", batas:539787860},
-    {code:"119", nama:"119 - INSTALASI FARMASI RSSG (RAWAT INAP)", batas:978100821},
-    {code:"134", nama:"134 - INSTALASI FARMASI RSSG (RAWAT JALAN)", batas:2742291831},
-    {code:"124", nama:"124 - POLI GIGI GRESIK", batas:47668170},
-    {code:"126", nama:"126 - POLIKLINIK KIA/KB", batas:164839355},
-    {code:"138", nama:"138 - HEMODIALISIS", batas:285051989},
-    {code:"123", nama:"123 - RADIOLOGI GRESIK", batas:78750821},
-    {code:"131", nama:"131 - SUB DAPUR GRESIK", batas:41214409},
-    {code:"133", nama:"133 - UMUM CETAKAN GRESIK", batas:106973075},
-    {code:"137", nama:"137 - CSSD", batas:63554579},
-    {code:"125", nama:"125 - CHECK UP GRESIK", batas:28107869},
+    {code:"122", nama:"122 - INSTALASI LABORATORIUM GRESIK", batas:204969885},
+    {code:"121", nama:"121 - INSTALASI BEDAH SENTRAL (IBS)", batas:456886522},
+    {code:"152", nama:"152 - DEPO FARMASI IGD", batas:412803731},
+    {code:"102", nama:"102 - Gudang Obat PT CN", batas:713059292},
+    {code:"119", nama:"119 - INSTALASI FARMASI RSSG (RAWAT INAP)", batas:723666685},
+    {code:"134", nama:"134 - INSTALASI FARMASI RSSG (RAWAT JALAN)", batas:2067481898},
+    {code:"124", nama:"124 - POLI GIGI GRESIK", batas:49809047},
+    {code:"126", nama:"126 - POLIKLINIK KIA/KB", batas:108679450},
+    {code:"138", nama:"138 - HEMODIALISIS", batas:172158397},
+    {code:"123", nama:"123 - RADIOLOGI GRESIK", batas:29104077},
+    {code:"131", nama:"131 - SUB DAPUR GRESIK", batas:65494783},
+    {code:"133", nama:"133 - UMUM CETAKAN GRESIK", batas:95931327},
+    {code:"137", nama:"137 - CSSD", batas:97004848},
+    {code:"125", nama:"125 - CHECK UP GRESIK", batas:36338695},
     {code:"151", nama:"151 - CATH LAB", batas:0},
     {code:"129", nama:"129 - ENDOSCOPY GRESIK", batas:13653417},
     {code:"101", nama:"101 - Gudang Non Obat PT CN", batas:126712095}
@@ -1206,7 +1210,7 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
     if(state.currentModule==="farmasi" && state.activeTab.farmasi==="ringkasan" && state.farmasi.loaded){
       /* grafik farmasi diganti bar HTML (renderFarmasiTopItems), tanpa Chart.js */
     } else if(state.currentModule==="logistik" && state.activeTab.logistik==="ringkasan" && state.logistik.loaded){
-      renderLogistikRingkasanCharts(applyLogistikFilters(state.logistik.rows));
+      /* grafik logistik diganti bar HTML (renderLogistikTopItems), tanpa Chart.js */
     }
   }
 
@@ -1460,6 +1464,9 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
       '<div class="mini-bar-track"><div class="mini-bar-fill" style="width:'+pct+'%"></div></div>'+
       '<div class="mini-bar-val">'+valLabel+'</div></div>';
   }
+  function totalLine(label, valLabel){
+    return '<div class="mini-bar-row total-line"><div class="name">'+esc(label)+'</div><div class="mini-bar-track" style="visibility:hidden"></div><div class="mini-bar-val">'+valLabel+'</div></div>';
+  }
   function emptyState(icon, title, hint, tab, module){
     return '<div class="empty-state"><div class="ic">'+icon+'</div><div class="title">'+esc(title)+'</div>'+
       '<div>'+esc(hint)+' <span class="link-action" data-action="nav" data-module="'+module+'" data-tab="'+tab+'">Buka import data</span></div></div>';
@@ -1674,11 +1681,12 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
     html += '</div>';
     var stc = logistikStatusStats(rows), lm = state.logistik.limits;
     html += '<div class="stat-row">';
-    html += statCard("Item di bawah stok minimum", fmtNum(stc[0]), "qty kurang dari min (default "+fmtNum(lm.min)+")");
+    html += statCard("Item di bawah stok minimum", fmtNum(stc[0]), "qty kurang dari min (default "+fmtNum(lm.min)+", qty 0 tanpa batas tidak dihitung)");
     html += statCard("Item melebihi stok maksimum", fmtNum(stc[2]), "qty lebih dari maks (default "+fmtNum(lm.max)+")");
     html += statCard("Item stok normal", fmtNum(stc[1]), "di antara minimum dan maksimum");
+    html += statCard("Kosong, batas belum diatur", fmtNum(stc[3]), "qty 0 dan stok minimum belum diisi di master");
     html += '</div>';
-    html += '<div class="note" style="margin-top:-8px;margin-bottom:18px"><span class="link-action" data-action="logistik-status" data-status="0">Lihat item di bawah minimum</span> · <span class="link-action" data-action="logistik-status" data-status="2">Lihat item melebihi maksimum</span></div>';
+    html += '<div class="note" style="margin-top:-8px;margin-bottom:18px"><span class="link-action" data-action="logistik-status" data-status="0">Lihat item di bawah minimum</span> · <span class="link-action" data-action="logistik-status" data-status="2">Lihat item melebihi maksimum</span> · <span class="link-action" data-action="logistik-status" data-status="3">Lihat item kosong tanpa batas</span></div>';
 
     var topGudang = sortRows(gudangAgg, "nilai", "desc").slice(0,6);
     var maxGudangNilai = topGudang.length ? topGudang[0].nilai : 1;
@@ -1700,10 +1708,7 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
     html += '</div>';
     html += '</div>';
 
-    html += '<div class="two-col">';
-    html += '<div class="panel"><h3>Grafik nilai persediaan per gudang</h3><div class="chart-box"><canvas id="chartLogistikGudang"></canvas></div></div>';
-    html += '<div class="panel"><h3>Grafik distribusi nilai per golongan</h3><div class="chart-box"><canvas id="chartLogistikGolongan"></canvas></div></div>';
-    html += '</div>';
+    html += renderLogistikTopItems(rows, totalNilai);
 
     if(state.logistik.skipped>0){
       html += '<div class="warn-box">'+fmtNum(state.logistik.skipped)+' baris dilewati karena kolom Gudang atau Barang kosong.</div>';
@@ -1749,24 +1754,30 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
     if(!state.logistik.loaded) return emptyState("▤","Belum ada data logistik","Import data terlebih dahulu untuk melihat rekap per gudang.","import","logistik");
     var filtered = applyLogistikFilters(state.logistik.rows);
     var agg = aggregateByGudangSimple(filtered);
+    var sb = logistikStatusBy(filtered, "gudang");
+    agg.forEach(function(g){ var c = sb[g.gudang] || [0,0,0,0]; g.s0=c[0]; g.s1=c[1]; g.s2=c[2]; g.s3=c[3]; });
     var s = state.logistik.sort.gudang;
     agg = sortRows(agg, s.key, s.dir);
 
     var totalAll = agg.reduce(function(a,g){return a+g.nilai;},0);
 
-    var html = '<p class="lede">Total nilai persediaan logistik per gudang. Jml item dihitung berdasarkan ID Barang unik (bukan jumlah baris/lokasi), karena Kode Barang pada data logistik tidak unik per barang.</p>';
+    var html = '<p class="lede">Total nilai persediaan logistik per gudang. Jml item dihitung berdasarkan ID Barang unik (bukan jumlah baris/lokasi), karena Kode Barang pada data logistik tidak unik per barang. Kolom status menghitung jumlah barang di gudang tersebut menurut stok minimum/maksimum (dibandingkan dengan qty barang di semua gudang, jadi barang yang sama bisa muncul di beberapa gudang).</p>';
 
     html += '<div class="table-wrap"><table><thead><tr>';
     html += th2("gudang","Gudang","left",s,"logistik");
     html += th2("items","Jml item","num",s,"logistik");
     html += th2("qty","Total qty","num",s,"logistik");
     html += th2("nilai","Nilai persediaan","num",s,"logistik");
+    html += th2("s0","Di bawah min","num",s,"logistik");
+    html += th2("s1","Normal","num",s,"logistik");
+    html += th2("s2","Melebihi maks","num",s,"logistik");
+    html += th2("s3","Kosong tanpa batas","num",s,"logistik");
     html += '</tr></thead><tbody>';
 
     var page = state.logistik.page.gudang, pageSize = state.logistik.pageSize.gudang;
     var pageRows = paginate(agg, page, pageSize);
     if(!pageRows.length){
-      html += '<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--text-secondary)">Tidak ada data untuk filter ini.</td></tr>';
+      html += '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-secondary)">Tidak ada data untuk filter ini.</td></tr>';
     }
     pageRows.forEach(function(g){
       html += '<tr>';
@@ -1774,6 +1785,10 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
       html += '<td class="num">'+fmtNum(g.items)+'</td>';
       html += '<td class="num">'+fmtNum(g.qty)+'</td>';
       html += '<td class="num">'+fmtRupiah(g.nilai)+'</td>';
+      html += '<td class="num"'+(g.s0>0?' style="color:var(--danger)"':'')+'>'+fmtNum(g.s0)+'</td>';
+      html += '<td class="num">'+fmtNum(g.s1)+'</td>';
+      html += '<td class="num"'+(g.s2>0?' style="color:var(--warning)"':'')+'>'+fmtNum(g.s2)+'</td>';
+      html += '<td class="num" style="color:var(--text-secondary)">'+fmtNum(g.s3)+'</td>';
       html += '</tr>';
     });
     html += '</tbody></table>';
@@ -1790,10 +1805,12 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
     if(!state.logistik.loaded) return emptyState("▦","Belum ada data logistik","Import data terlebih dahulu untuk melihat rekap per golongan.","import","logistik");
     var filtered = applyLogistikFilters(state.logistik.rows);
     var agg = aggregateByKategori(filtered);
+    var sb = logistikStatusBy(filtered, "golongan");
+    agg.forEach(function(k){ var c = sb[k.kategori] || [0,0,0,0]; k.s0=c[0]; k.s1=c[1]; k.s2=c[2]; k.s3=c[3]; });
     var s = state.logistik.sort.golongan;
     agg = sortRows(agg, s.key, s.dir);
 
-    var html = '<p class="lede">Rekap barang logistik berdasarkan golongan sesuai data sumber (mis. Consumable / Suku Cadang Medis, Consume Product / Bahan Cetakan, dsb).</p>';
+    var html = '<p class="lede">Rekap barang logistik berdasarkan golongan sesuai data sumber (mis. Consumable / Suku Cadang Medis, Consume Product / Bahan Cetakan, dsb). Kolom status menghitung jumlah barang menurut stok minimum/maksimum (dibandingkan dengan qty barang di semua gudang).</p>';
 
     html += '<div class="table-wrap"><table><thead><tr>';
     html += th2("kategori","Golongan","left",s,"logistik");
@@ -1801,12 +1818,16 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
     html += th2("qty","Total qty","num",s,"logistik");
     html += th2("nilai","Nilai persediaan","num",s,"logistik");
     html += th2("share","% dari total","num",s,"logistik");
+    html += th2("s0","Di bawah min","num",s,"logistik");
+    html += th2("s1","Normal","num",s,"logistik");
+    html += th2("s2","Melebihi maks","num",s,"logistik");
+    html += th2("s3","Kosong tanpa batas","num",s,"logistik");
     html += '</tr></thead><tbody>';
 
     var page = state.logistik.page.golongan, pageSize = state.logistik.pageSize.golongan;
     var pageRows = paginate(agg, page, pageSize);
     if(!pageRows.length){
-      html += '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-secondary)">Tidak ada data untuk filter ini.</td></tr>';
+      html += '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-secondary)">Tidak ada data untuk filter ini.</td></tr>';
     }
     pageRows.forEach(function(k){
       html += '<tr>';
@@ -1815,6 +1836,10 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
       html += '<td class="num">'+fmtNum(k.qty)+'</td>';
       html += '<td class="num">'+fmtRupiah(k.nilai)+'</td>';
       html += '<td class="num">'+fmtPct(k.share)+'</td>';
+      html += '<td class="num"'+(k.s0>0?' style="color:var(--danger)"':'')+'>'+fmtNum(k.s0)+'</td>';
+      html += '<td class="num">'+fmtNum(k.s1)+'</td>';
+      html += '<td class="num"'+(k.s2>0?' style="color:var(--warning)"':'')+'>'+fmtNum(k.s2)+'</td>';
+      html += '<td class="num" style="color:var(--text-secondary)">'+fmtNum(k.s3)+'</td>';
       html += '</tr>';
     });
     html += '</tbody></table>';
@@ -1827,19 +1852,44 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
 
   /* ============================= LOGISTIK: STOK MIN / MAKS (dari master barang) ============================= */
 
-  var ST_LABEL = ["Di bawah minimum","Normal","Melebihi maksimum"];
-  var ST_CLS = ["pill-over","pill-ok","pill-warn"];
+  var ST_LABEL = ["Di bawah minimum","Normal","Melebihi maksimum","Kosong, batas belum diatur"];
+  var ST_CLS = ["pill-over","pill-ok","pill-warn","pill-unset"];
 
   // Batas default (min 1, maks 1000). Batas per barang dari file master (STOCKMIN/STOCKMAX > 0) menggantikan default.
   function logistikLimit(it){
     var L = state.logistik.limits;
     var o = L.items[it.key] || L.items["n:"+String(it.namaBarang).trim().toLowerCase()];
-    return {
-      min: (o && o.min!=null) ? o.min : L.min,
-      max: (o && o.max!=null) ? o.max : L.max,
-      satuan: o ? o.satuan : null,
-      custom: !!(o && (o.min!=null || o.max!=null))
-    };
+    var hasMin = !!(o && o.min!=null), hasMax = !!(o && o.max!=null);
+    var mn = hasMin ? o.min : L.min, mx = hasMax ? o.max : L.max;
+    // Batas yang saling bertabrakan dirapikan: hanya min diisi dan lebih besar dari maks default -> tanpa batas atas;
+    // hanya maks diisi dan lebih kecil dari min default -> min ikut turun.
+    if(mx < mn){
+      if(hasMin && !hasMax) mx = null;
+      else if(hasMax && !hasMin) mn = mx;
+      else mx = mn;
+    }
+    return { min: mn, max: mx, satuan: o ? o.satuan : null, custom: hasMin || hasMax, hasMin: hasMin };
+  }
+  // 0 = di bawah min, 1 = normal, 2 = melebihi maks, 3 = kosong dan stok minimum belum diatur (bukan kekurangan stok yang pasti)
+  function logistikStatusNum(q, lim){
+    if(!lim.hasMin && q <= 0) return 3;
+    if(q < lim.min) return 0;
+    if(lim.max !== null && q > lim.max) return 2;
+    return 1;
+  }
+  // Jumlah barang per status di tiap gudang / golongan (status tetap dihitung dari qty semua gudang)
+  function logistikStatusBy(rows, field){
+    var qa = logistikQtyAll(), out = {}, seen = {};
+    rows.forEach(function(r){
+      var g = field==="gudang" ? r.gudang : r.kategori;
+      var k = itemKey(r)+"||"+r.namaBarang, sk = g+"##"+k;
+      if(seen[sk]) return; seen[sk] = 1;
+      var q = qa[k]; if(q===undefined) q = r.qty;
+      var n = logistikStatusNum(q, logistikLimit({key:itemKey(r), namaBarang:r.namaBarang}));
+      if(!out[g]) out[g] = [0,0,0,0];
+      out[g][n]++;
+    });
+    return out;
   }
   // Qty tiap barang di SEMUA gudang (batas master berlaku per barang, bukan per gudang)
   function logistikQtyAll(){
@@ -1857,19 +1907,19 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
       var lim = logistikLimit(it);
       it.minStok = lim.min; it.maxStok = lim.max; it.satuan = lim.satuan; it.custom = lim.custom;
       it.qtyAll = qa[it.key+"||"+it.namaBarang]; if(it.qtyAll===undefined) it.qtyAll = it.qty;
-      it.stNum = it.qtyAll < lim.min ? 0 : (it.qtyAll > lim.max ? 2 : 1);
+      it.stNum = logistikStatusNum(it.qtyAll, lim);
       return it;
     });
   }
   function logistikStatusField(f){
-    var opts = [["all","Semua status"],["0","Di bawah minimum"],["1","Normal"],["2","Melebihi maksimum"]];
+    var opts = [["all","Semua status"],["0","Di bawah minimum"],["1","Normal"],["2","Melebihi maksimum"],["3","Kosong, batas belum diatur"]];
     var cur = f.status || "all";
     var h = '<div class="filter-field"><label>Status stok</label><select data-action="filter-logistik" data-key="status">';
     opts.forEach(function(o){ h += '<option value="'+o[0]+'"'+(cur===o[0]?" selected":"")+'>'+o[1]+'</option>'; });
     return h + '</select></div>';
   }
   function logistikStatusStats(rows){
-    var c = [0,0,0];
+    var c = [0,0,0,0];
     logistikDetailRows(rows).forEach(function(it){ c[it.stNum]++; });
     return c;
   }
@@ -1884,7 +1934,7 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
     agg = sortRows(agg, s.key, s.dir);
     var L = state.logistik.limits, gsel = state.logistik.filters.gudang!=="all";
 
-    var html = '<p class="lede">Detail nama barang, total nilai persediaan, dan status stok terhadap batas minimum dan maksimum. Status dihitung dari qty barang di <b>semua gudang</b> (batas berlaku per barang). '+
+    var html = '<p class="lede">Detail nama barang, total nilai persediaan, dan status stok terhadap batas minimum dan maksimum. Status dihitung dari qty barang di <b>semua gudang</b> (batas berlaku per barang). Barang dengan qty 0 yang stok minimumnya belum diatur ditandai "Kosong, batas belum diatur", bukan "Di bawah minimum". '+
       (state.master.loaded ? 'Batas per barang diambil dari file master; barang yang belum diatur memakai default (min '+fmtNum(L.min)+', maks '+fmtNum(L.max)+').'
                            : 'Batas sementara memakai default untuk semua barang: min '+fmtNum(L.min)+', maks '+fmtNum(L.max)+'. Upload file master di menu Batas stok untuk batas per barang.')+'</p>';
 
@@ -1911,7 +1961,7 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
       html += '<td class="num">'+fmtNum(it.gudangCount)+'</td>';
       html += '<td class="num">'+fmtNum(it.qty)+(it.satuan?' <span style="color:var(--text-secondary)">'+esc(it.satuan)+'</span>':'')+(gsel&&it.qtyAll!==it.qty?'<div class="name-secondary">semua gudang: '+fmtNum(it.qtyAll)+'</div>':'')+'</td>';
       html += '<td class="num">'+fmtNum(it.minStok)+'</td>';
-      html += '<td class="num">'+fmtNum(it.maxStok)+'</td>';
+      html += '<td class="num">'+(it.maxStok===null ? "–" : fmtNum(it.maxStok))+'</td>';
       html += '<td><span class="pill '+ST_CLS[it.stNum]+'">'+ST_LABEL[it.stNum]+'</span></td>';
       html += '<td class="num">'+fmtRupiah(it.nilai)+'</td>';
       html += '</tr>';
@@ -1929,7 +1979,9 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
     if(!raw.length) return null;
     var H = {};
     Object.keys(raw[0]).forEach(function(h){ H[normalizeHeader(h)] = h; });
-    var hid=H.idbarang, hn=H.namabarang, hmin=H.stockmin, hmax=H.stockmax;
+    var hid=H.idbarang, hn=H.namabarang;
+    var hmin=H.stockmin||H.stokmin||H.stokminimal||H.stockminimum||H.stokminimum||H.minstock||H.minimumstock||H.minstok;
+    var hmax=H.stockmax||H.stokmax||H.stokmaks||H.stokmaksimal||H.stockmaximum||H.stokmaximum||H.maxstock||H.maximumstock||H.maxstok;
     if(!hn || (!hmin && !hmax)) return null;
     var hs=H.namasatuanjual||H.namasatuanbeli, ha=H.namacoapersediaan, hst=H.status, rows=[], skipped=0;
     raw.forEach(function(r){
@@ -1998,6 +2050,23 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
     return html + renderUploadHistory("master");
   }
 
+  /* ============================= LOGISTIK: GRAFIK DETAIL NILAI PER BARANG ============================= */
+
+  function renderLogistikTopItems(rows, total){
+    var n = state.logistik.topN || 15;
+    var top = sortRows(aggregateDetail(rows), "nilai", "desc").slice(0, n);
+    var mx = top.length ? Math.max(top[0].nilai, 1) : 1, sum = 0;
+    top.forEach(function(it){ sum += it.nilai; });
+    var h = '<div class="panel"><div class="table-toolbar"><h3 style="margin:0">Detail nilai persediaan per barang</h3><select data-action="logistik-topn">';
+    [10,15,25,50].forEach(function(x){ h += '<option value="'+x+'"'+(n===x?" selected":"")+'>'+x+' barang teratas</option>'; });
+    h += '</select></div>';
+    top.forEach(function(it){
+      h += barRow(it.namaBarang, it.nilai, mx, fmtRupiah(it.nilai)+" · "+fmtPct(total>0 ? it.nilai/total*100 : 0));
+    });
+    h += '<div class="note">'+fmtNum(top.length)+' barang teratas = '+fmtRupiah(sum)+' ('+fmtPct(total>0 ? sum/total*100 : 0)+' dari total nilai pada filter ini). Daftar lengkap ada di tab Detail barang.</div></div>';
+    return h;
+  }
+
   /* ============================= FARMASI: GRAFIK DETAIL NILAI PER BARANG ============================= */
 
   function renderFarmasiTopItems(rows, total){
@@ -2044,7 +2113,7 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
   function renderUmurDetail(){
     var u=state.umur, rows=umurDetailRows(), s=u.sort.detail;
     rows=sortRows(rows,s.key,s.dir);
-    var tn=0,to=0; rows.forEach(function(r){ tn+=r.nilai; if(r.b===4) to+=r.nilai; });
+    var tn=0,to=0,tq=0; rows.forEach(function(r){ tn+=r.nilai; tq+=r.qty; if(r.b===4) to+=r.nilai; });
     var html=umurWarn();
     html+='<p class="lede">Detail barang beserta tanggal pembelian terakhir dan umur persediaannya (acuan '+esc(u.ref)+'). Qty dan nilai dijumlahkan sesuai filter gudang, kategori, dan sumber yang aktif.</p>';
     html+='<div class="table-wrap"><table><thead><tr>'+th2("name","Nama barang","left",s,"umur")+'<th>Kategori</th>'+th2("gudangCount","Jml gudang","num",s,"umur")+th2("qty","Total qty","num",s,"umur")+th2("nilai","Nilai persediaan","num",s,"umur")+th2("lt","Pembelian terakhir","left",s,"umur")+th2("days","Umur (hari)","num",s,"umur")+th2("b","Kelompok umur","left",s,"umur")+'</tr></thead><tbody>';
@@ -2055,6 +2124,7 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
       html+='<tr><td class="name-cell"><div class="name-primary">'+esc(r.name)+'</div><div class="name-secondary">'+esc(r.sumber)+'</div></td><td>'+esc(r.kategori)+'</td><td class="num">'+fmtNum(r.gudangCount)+'</td><td class="num">'+fmtNum(r.qty)+'</td><td class="num">'+fmtRupiah(r.nilai)+'</td>'+
         '<td>'+(r.has?esc(dayToIso(r.lt)):'<span style="color:var(--text-secondary)">Tidak ada riwayat</span>')+'</td><td class="num">'+fmtNum(r.days)+'</td><td><span class="pill '+cls+'">'+BK[r.b]+' hari</span></td></tr>';
     });
+    if(rows.length) html+='<tr class="total-row"><td>Total ('+fmtNum(rows.length)+' barang, semua halaman)</td><td></td><td></td><td class="num">'+fmtNum(tq)+'</td><td class="num">'+fmtRupiah(tn)+'</td><td></td><td></td><td></td></tr>';
     html+='</tbody></table>'+tableFoot2(rows.length,page,size,"detail","umur")+'</div>';
     html+='<div class="note">'+fmtNum(rows.length)+' barang · total nilai <strong class="num">'+fmtRupiah(tn)+'</strong> · umur &gt;120 hari <strong class="num">'+fmtRupiah(to)+'</strong></div>';
     return html;
@@ -2235,6 +2305,8 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
         switchEntity(t.value);
       } else if(t.dataset && t.dataset.action==="farmasi-topn"){
         state.farmasi.topN = +t.value || 15; render();
+      } else if(t.dataset && t.dataset.action==="logistik-topn"){
+        state.logistik.topN = +t.value || 15; render();
       } else if(t.id==="file-master" && t.files && t.files[0]){
         handleMasterFile(t.files[0]);
       } else if(t.dataset && t.dataset.action==="umur-merge"){
@@ -2478,12 +2550,15 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
     html+='</div><div class="two-col"><div class="panel"><h3>Sebaran umur persediaan</h3>';
     var mx=Math.max.apply(null,T.b.concat([1]));
     BK.forEach(function(b,i){ html+=barRow(b+" hari",T.b[i],mx,'<span class="num">'+fmtRupiah(T.b[i])+'</span>'); });
+    html+=totalLine("Total",fmtRupiah(T.v));
     html+='</div><div class="panel"><h3>Umur &gt;120 hari per kategori</h3>';
     var ks=c.K.slice().sort(function(a,b){return b.b4-a.b4;}), mk=ks.length?Math.max(ks[0].b4,1):1;
     ks.forEach(function(k){ html+=barRow(k.name,k.b4,mk,'<span class="num">'+fmtRupiah(k.b4)+'</span>'); });
+    html+=totalLine("Total",fmtRupiah(T.b[4]));
     html+='</div></div><div class="panel"><h3>10 gudang dengan stok &gt;120 hari terbesar</h3>';
     var gs=c.G.slice().sort(function(a,b){return b.b4-a.b4;}).slice(0,10), mg=gs.length?Math.max(gs[0].b4,1):1;
     gs.forEach(function(g){ html+=barRow(g.name,g.b4,mg,'<span class="num">'+fmtRupiah(g.b4)+'</span>'); });
+    html+=totalLine("Total semua gudang ("+fmtNum(c.G.length)+")",fmtRupiah(T.b[4]));
     return html+'</div>';
   }
 
@@ -2504,6 +2579,11 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
       for(var i=0;i<5;i++) html+='<td class="num"'+(i===4&&r.b4>0?' style="color:var(--danger)"':'')+'>'+(r["b"+i]?fmtNum(r["b"+i]):'-')+'</td>';
       html+='</tr>';
     });
+    if(rows.length){
+      html+='<tr class="total-row"><td>Total ('+fmtNum(rows.length)+' '+(scope==="gudang"?"gudang":"kategori")+', semua halaman)</td><td class="num">'+fmtNum(tot[0])+'</td>';
+      for(var j=1;j<=5;j++) html+='<td class="num"'+(j===5&&tot[5]>0?' style="color:var(--danger)"':'')+'>'+(tot[j]?fmtNum(tot[j]):'-')+'</td>';
+      html+='</tr>';
+    }
     html+='</tbody></table>'+tableFoot2(rows.length,page,size,scope,"umur")+'</div>';
     html+='<div class="note">Total pada filter saat ini: <strong class="num">'+fmtRupiah(tot[0])+'</strong> · &gt;120 hari: <strong class="num">'+fmtRupiah(tot[5])+'</strong></div>';
     return html;
@@ -2556,17 +2636,30 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
     if(fa) cols.push({h:"Batas",t:"n",w:18},{h:"% dari batas",t:"p",w:13},{h:"Status",t:"s",w:16});
     var r=agg.map(function(g){ var a=[g.gudang,g.items,g.qty,g.nilai]; if(fa) a.push(g.batas,(g.pct===null||g.pct>=9999)?null:g.pct,ST_FARM[g.status]); return a; });
     var t=["Total",null,sumCol(r,2),sumCol(r,3)]; if(fa) t.push(null,null,null);
+    if(!fa){
+      var sb=logistikStatusBy(rows,"gudang");
+      cols.push({h:"Di bawah min",t:"n",w:13},{h:"Normal",t:"n",w:11},{h:"Melebihi maks",t:"n",w:14},{h:"Kosong tanpa batas",t:"n",w:18});
+      r=agg.map(function(g,i){ var c=sb[g.gudang]||[0,0,0,0]; return r[i].concat([c[0],c[1],c[2],c[3]]); });
+      t=["Total",null,sumCol(r,2),sumCol(r,3),null,null,null,null];
+    }
     return {name:"Rekap Per Gudang", cols:cols, rows:r, total:t};
   }
   function tblKategori(m,rows){
     var fa=(m==="farmasi"), s=srt(m,fa?"kategori":"golongan"), agg=sortRows(aggregateByKategori(rows),s.key,s.dir), lbl=fa?"Kategori":"Golongan";
     var r=agg.map(function(k){ return [k.kategori,k.itemCount,k.qty,k.nilai,k.share]; });
-    return {name:"Rekap Per "+lbl, cols:[{h:lbl,t:"s",w:38},{h:"Item unik",t:"n",w:12},{h:"Total qty",t:"n",w:14},{h:"Nilai persediaan",t:"n",w:20},{h:"% dari total",t:"p",w:13}], rows:r, total:["Total",null,sumCol(r,2),sumCol(r,3),sumCol(r,4)]};
+    var cols=[{h:lbl,t:"s",w:38},{h:"Item unik",t:"n",w:12},{h:"Total qty",t:"n",w:14},{h:"Nilai persediaan",t:"n",w:20},{h:"% dari total",t:"p",w:13}], tot=["Total",null,sumCol(r,2),sumCol(r,3),sumCol(r,4)];
+    if(!fa){
+      var sb=logistikStatusBy(rows,"golongan");
+      cols.push({h:"Di bawah min",t:"n",w:13},{h:"Normal",t:"n",w:11},{h:"Melebihi maks",t:"n",w:14},{h:"Kosong tanpa batas",t:"n",w:18});
+      r=agg.map(function(k,i){ var c=sb[k.kategori]||[0,0,0,0]; return r[i].concat([c[0],c[1],c[2],c[3]]); });
+      tot=["Total",null,sumCol(r,2),sumCol(r,3),sumCol(r,4),null,null,null,null];
+    }
+    return {name:"Rekap Per "+lbl, cols:cols, rows:r, total:tot};
   }
-  function tblTopFarmasi(rows,n){
+  function tblTopFarmasi(rows,n,lbl){
     var agg=sortRows(aggregateDetail(rows),"nilai","desc"), tot=sumCol(agg.map(function(x){return [x.nilai];}),0), top=agg.slice(0,n);
     var r=top.map(function(it){ return [it.namaBarang,it.kategori,it.qty,it.nilai,tot>0?it.nilai/tot*100:0]; });
-    return {name:"Top "+n+" Barang (Nilai)", cols:[{h:"Nama barang",t:"s",w:50},{h:"Kategori",t:"s",w:18},{h:"Total qty",t:"n",w:14},{h:"Nilai persediaan",t:"n",w:20},{h:"% dari total",t:"p",w:13}], rows:r};
+    return {name:"Top "+n+" Barang (Nilai)", cols:[{h:"Nama barang",t:"s",w:50},{h:lbl||"Kategori",t:"s",w:18},{h:"Total qty",t:"n",w:14},{h:"Nilai persediaan",t:"n",w:20},{h:"% dari total",t:"p",w:13}], rows:r};
   }
   function tblDetail(m,rows){
     var fa=(m==="farmasi"), s=srt(m,"detail"), agg;
@@ -2609,9 +2702,9 @@ function fieldsFor(moduleKey){ return moduleKey==="farmasi" ? FARMASI_FIELDS : (
       if(tab==="ringkasan"){
         var det=aggregateDetail(rows), gs={}; rows.forEach(function(r){ gs[r.gudang]=1; });
         var kp=[["Total nilai persediaan (Rp)",sumCol(rows.map(function(r){return [r.persediaan];}),0)],["Total qty",sumCol(rows.map(function(r){return [r.qty];}),0)],["Jumlah gudang",Object.keys(gs).length],["Jumlah barang unik",det.length]];
-        if(!fa){ var sc=logistikStatusStats(rows); kp.push(["Item di bawah stok minimum",sc[0]],["Item melebihi stok maksimum",sc[2]],["Item stok normal",sc[1]]); }
+        if(!fa){ var sc=logistikStatusStats(rows); kp.push(["Item di bawah stok minimum",sc[0]],["Item melebihi stok maksimum",sc[2]],["Item stok normal",sc[1]],["Item kosong, batas belum diatur",sc[3]]); }
         sheets=[tblKpi(kp),tblGudang(m,rows),tblKategori(m,rows)];
-        if(fa) sheets.push(tblTopFarmasi(rows,20));
+        sheets.push(tblTopFarmasi(rows,20,fa?"Kategori":"Golongan"));
       } else if(tab==="gudang") sheets=[tblGudang(m,rows)];
       else if(tab==="detail") sheets=[tblDetail(m,rows)];
       else sheets=[tblKategori(m,rows)];
